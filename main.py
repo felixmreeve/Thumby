@@ -1,27 +1,5 @@
-distance = 2
-distances = [4.0, 1.0, 4.0, 0.5, 0.5, 1.0, 3.0]
-total_distance = sum(distances)
-print(f"total_distance {total_distance}")
-n_segments = round(total_distance/distance)
-fdist = total_distance/n_segments
-dist_i = 0
-running_total = 0 
-current_dist = 0
-print(distances)
-seg_dist_total = 0
-for i, seg_dist in enumerate(distances):
-	print(f"\nsegment {i}: {seg_dist} starts at {seg_dist_total}")
-	while current_dist < seg_dist:
-		t = current_dist/seg_dist
-		print(f"P: {running_total}, {t}")
-		
-		current_dist += fdist
-		running_total += fdist
-	current_dist -= seg_dist
-	seg_dist_total += seg_dist
-
-#raise Exception("stop")
-
+# display is 72x40
+# 0,0 is top left
 import math
 import random
 import time
@@ -30,21 +8,23 @@ import time
 import thumbyGraphics
 import thumbyButton
 
-# display is 72x40
-# 0,0 is top left
+
+global DEBUG_MODE, DEBUG_DOTS
 DEBUG_MODE = False
+DEBUG_DOTS = False
 
 
 def dprint(*args, **kwargs):
+	global DEBUG_MODE
 	if DEBUG_MODE:
 		print(*args, **kwargs)
 
 
-def next_point(i, track):
+def next_idx(i, track):
 	return (i+2) % len(track)
 
 
-def prev_point(i, track):
+def prev_idx(i, track):
 	return (i-2) % len(track)
 
 
@@ -76,7 +56,7 @@ def generate_mid_points(key_track, n_segment_points):
 	track = []
 	for i in range(0, len(key_track), 2):
 		x, y = key_track[i], key_track[i+1]
-		i1 = next_point(i, key_track)
+		i1 = next_idx(i, key_track)
 		x1, y1 = key_track[i1], key_track[i1+1]
 		# seqment points are mid points plus key point
 		for i in range(n_segment_points):
@@ -105,8 +85,8 @@ def generate_quadratic_bezier_points(segment_track,
 									 n_curve_segments):
 	track = []
 	for i1 in range(0, len(segment_track), 2*key_step):
-		i0 = prev_point(i1, segment_track)
-		i2 = next_point(i1, segment_track)
+		i0 = prev_idx(i1, segment_track)
+		i2 = next_idx(i1, segment_track)
 		x0, y0 = segment_track[i0], segment_track[i0+1]
 		x1, y1 = segment_track[i1], segment_track[i1+1]
 		x2, y2 = segment_track[i2], segment_track[i2+1]
@@ -123,36 +103,36 @@ def generate_quadratic_bezier_points(segment_track,
 	return track
 
 
-def resample_track(og_track, segment_dist):
-	track = []
+def resample_track(in_track, segment_dist):
+	# first calculate all current segment distances
 	distances = []
-	for i0 in range(0, len(og_track), 2):
-		i1 = next_point(i0, og_track)
-		x0, y0 = og_track[i0], og_track[i0+1]
-		x1, y1 = og_track[i1], og_track[i1+1]
+	for i0 in range(0, len(in_track), 2):
+		i1 = next_idx(i0, in_track)
+		x0, y0 = in_track[i0], in_track[i0+1]
+		x1, y1 = in_track[i1], in_track[i1+1]
 		vx = x1-x0
 		vy = y1-y0
 		distance = math.sqrt(vx*vx + vy*vy)
 		distances.append(distance)
 	total_distance = sum(distances)
-	print(f"total track distance {total_distance}")
 	n_segments = round(total_distance/segment_dist)
 	fdist = total_distance/n_segments
-	print(f"using {n_segments} segments to resample by {fdist} distance")
-	
+	track = []
+	current_dist = 0
+	x0, y0 = in_track[0], in_track[1]
 	for i, seg_dist in enumerate(distances):
-		print(f"\nsegment {i}: {seg_dist} starts at {seg_dist_total}")
+		i1 = next_idx(i*2, in_track) # i*2 to get in_track x value idx
+		x1, y1 = in_track[i1], in_track[i1+1]
 		while current_dist < seg_dist:
 			t = current_dist/seg_dist
-			print(f"P: {running_total}, {t}")
-			
+			x = (1-t)*x0 + t*x1
+			y = (1-t)*y0 + t*y1
+			track.append(x)
+			track.append(y)
 			current_dist += fdist
-			running_total += fdist
 		current_dist -= seg_dist
-		seg_dist_total += seg_dist
-	
-		
-	return og_track
+		x0, y0 = x1, y1
+	return track
 
 
 def generate_track(width, height,
@@ -166,18 +146,18 @@ def generate_track(width, height,
 					  to wavier, smoother curves
 					  and less straights
 	"""
-	print("generating_track")
-	print("generating key points")
+	dprint("generating_track")
+	dprint("generating key points")
 	key_points = generate_key_points(width, height,
 								n_key_points)
-	print("generating mid points")
+	dprint("generating mid points")
 	track = generate_mid_points(key_points, n_segment_points)
-	print("generating bezier curves")
+	dprint("generating bezier curves")
 	track = generate_quadratic_bezier_points(
 			track, n_segment_points, 6)
-	print("resampling")
+	dprint("resampling")
 	track = resample_track(track, resample_segment_length)
-	print("generated track!")
+	dprint("generated track!")
 	return track, key_points
 
 
@@ -191,29 +171,37 @@ def drawScene(track, key_points):
 	thumbyGraphics.display.fill(0) # Fill canvas to black
 	for i in range(0, len(track), 2):
 		x0, y0 = track[i], track[i+1]
-		i1 = next_point(i, track)
+		i1 = next_idx(i, track)
 		x1, y1 = track[i1], track[i1+1]
-		thumbyGraphics.display.drawLine(x0, y0, x1, y1, 1)
-	if DEBUG_MODE:
+		if DEBUG_MODE and DEBUG_DOTS:
+			thumbyGraphics.display.setPixel(x0, y0, 1)
+		else:
+			thumbyGraphics.display.drawLine(x0, y0, x1, y1, 1)
+	if DEBUG_MODE and not DEBUG_DOTS:
 		debugDrawScene(key_points)
 	thumbyGraphics.display.update()
 
 
 def main():
+	global DEBUG_DOTS
 	# Set the FPS (without this call, the default fps is 30)
 	thumbyGraphics.display.setFPS(60)
-	print("entering main loop")
+	dprint("entering main loop")
 	seed = 0
 	random.seed(seed)
 	while(1):
 		track, key_points = generate_track(
 						   thumbyGraphics.display.width,
 						   thumbyGraphics.display.height,
-						   12, 2, 2)
+						   12, 2, 4)
 		track = [int(p) for p in track]
+		key_points = [int(p) for p in key_points]
 		drawScene(track, key_points)
 		while not thumbyButton.buttonA.justPressed():
-			#hold here until a is pressed
+			#hold in loop until a is pressed
+			if thumbyButton.buttonB.justPressed():
+				#flip DEBUG DOTS
+				DEBUG_DOTS = not DEBUG_DOTS
 			pass
 
 main()
