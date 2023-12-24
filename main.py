@@ -10,8 +10,16 @@ import thumbyButton
 
 
 global DEBUG_MODE, DEBUG_DOTS
-DEBUG_MODE = False
+DEBUG_MODE = True
 DEBUG_DOTS = False
+
+global transform_params
+transform_params = {
+		"x":        0.0,
+		"y":        0.0,
+		"rotation": 0.0,
+		"scale":    1.0
+}
 
 
 def dprint(*args, **kwargs):
@@ -26,6 +34,14 @@ def next_idx(i, track):
 
 def prev_idx(i, track):
 	return (i-2) % len(track)
+
+
+def on_screen(x, y):
+	if 0 <= x < thumbyGraphics.display.width \
+	   and 0 <= y <thumbyGraphics.display.height:
+		   return True
+	else:
+		return False
 
 
 def generate_key_points(width, height,
@@ -147,6 +163,12 @@ def generate_track(width, height,
 					  and less straights
 	"""
 	dprint("generating_track")
+	if not type(width) == int:
+		print("randomising width")
+		width = random.randint(width[0], width[1])
+	if not type(height) == int:
+		print("randomising height")
+		height = random.randint(height[0], height[1])
 	dprint("generating key points")
 	key_points = generate_key_points(width, height,
 								n_key_points)
@@ -155,6 +177,7 @@ def generate_track(width, height,
 	dprint("generating bezier curves")
 	track = generate_quadratic_bezier_points(
 			track, n_segment_points, 6)
+		
 	dprint("resampling")
 	track = resample_track(track, resample_segment_length)
 	dprint("generated track!")
@@ -167,16 +190,17 @@ def debugDrawScene(key_points):
 		thumbyGraphics.display.setPixel(x, y, 1)
 
 
-def drawScene(track, key_points):
+def drawScene(camera, track, key_points):
 	thumbyGraphics.display.fill(0) # Fill canvas to black
 	for i in range(0, len(track), 2):
 		x0, y0 = track[i], track[i+1]
 		i1 = next_idx(i, track)
 		x1, y1 = track[i1], track[i1+1]
-		if DEBUG_MODE and DEBUG_DOTS:
-			thumbyGraphics.display.setPixel(x0, y0, 1)
-		else:
-			thumbyGraphics.display.drawLine(x0, y0, x1, y1, 1)
+		if on_screen(x0, y0) or on_screen(x1, y1):
+			if DEBUG_MODE and DEBUG_DOTS:
+				thumbyGraphics.display.setPixel(x0, y0, 1)
+			else:
+				thumbyGraphics.display.drawLine(x0, y0, x1, y1, 1)
 	if DEBUG_MODE and not DEBUG_DOTS:
 		debugDrawScene(key_points)
 	thumbyGraphics.display.update()
@@ -187,21 +211,26 @@ def main():
 	# Set the FPS (without this call, the default fps is 30)
 	thumbyGraphics.display.setFPS(60)
 	dprint("entering main loop")
-	seed = 0
+	seed = time.ticks_cpu()
+	if DEBUG_MODE: seed = 0
 	random.seed(seed)
+	camera = transform_params.copy()
+	track_transform = transform_params.copy()
 	while(1):
 		track, key_points = generate_track(
-						   thumbyGraphics.display.width,
-						   thumbyGraphics.display.height,
-						   12, 2, 4)
+						   (thumbyGraphics.display.width//2,thumbyGraphics.display.width*2),
+						   (thumbyGraphics.display.height//2, thumbyGraphics.display.height*2),
+						   12, 2, 5)
 		track = [int(p) for p in track]
 		key_points = [int(p) for p in key_points]
-		drawScene(track, key_points)
+		print("drawing scene")
+		drawScene(camera, track, key_points)
 		while not thumbyButton.buttonA.justPressed():
 			#hold in loop until a is pressed
 			if thumbyButton.buttonB.justPressed():
 				#flip DEBUG DOTS
 				DEBUG_DOTS = not DEBUG_DOTS
+				drawScene(camera, track, key_points)
 			pass
 
 main()
