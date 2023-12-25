@@ -13,14 +13,6 @@ global DEBUG_MODE, DEBUG_DOTS
 DEBUG_MODE = True
 DEBUG_DOTS = False
 
-global transform_params
-transform_params = {
-		"x":        0.0,
-		"y":        0.0,
-		"rotation": 0.0,
-		"scale":    1.0
-}
-
 
 def dprint(*args, **kwargs):
 	global DEBUG_MODE
@@ -36,6 +28,61 @@ def prev_idx(i, track):
 	return (i-2) % len(track)
 
 
+# matrix: [
+# 0, 1, 2,
+# 3, 4, 5,
+# 6, 7, 8
+# ]
+
+
+def identity_matrix():
+	return [
+		1, 0, 0,
+		0, 1, 0,
+		0, 0, 1
+	]
+	
+def matrix_multiply(a, b):
+	c = [
+		a[0]*b[0] + a[1]*b[3] + a[2]*b[6],
+			a[0]*b[1] + a[1]*b[4] + a[2]*b[7],
+				a[0]*b[2] + a[1]*b[5] + a[2]*b[8],
+		a[3]*b[0] + a[4]*b[3] + a[5]*b[6],
+			a[3]*b[1] + a[4]*b[4] + a[5]*b[7],
+				a[3]*b[2] + a[4]*b[5] + a[5]*b[8],
+		# could probably hard code the last line
+		a[6]*b[0] + a[7]*b[3] + a[8]*b[6],
+			a[6]*b[1] + a[7]*b[4] + a[8]*b[7],
+				a[6]*b[2] + a[7]*b[5] + a[8]*b[8]
+	]
+	return c
+
+
+def translate(entity, x, y):
+	entity["transform"][2] += x
+	entity["transform"][5] += y
+
+
+def rotate(entity, a):
+	sa = math.sin(a)
+	ca = math.cos(a)
+	mat = [
+		ca, -sa, 0,
+		sa,  ca, 0,
+		0,    0, 1
+	]
+	entity["transform"] = matrix_multiply(mat, entity["transform"]):
+
+
+def scale(entity, s):
+	mat = [
+		s, 0, 0,
+		0, s, 0,
+		0, 0, 1
+	]
+	entity["transform"] = matrix_multiply(mat, entity["transform"])
+
+
 def on_screen(x, y):
 	if 0 <= x < thumbyGraphics.display.width \
 	   and 0 <= y <thumbyGraphics.display.height:
@@ -44,8 +91,7 @@ def on_screen(x, y):
 		return False
 
 
-def generate_key_points(width, height,
-						n_key_points):
+def generate_key_points(width, height, n_key_points):
 	track = []
 	# generate key points at regular angles
 	# with some variation in distance from centre
@@ -94,11 +140,9 @@ def frange(start, stop, step):
 			break
 		yield temp
 		count += 1
-	
 
-def generate_quadratic_bezier_points(segment_track,
-									 key_step,
-									 n_curve_segments):
+
+def generate_quadratic_bezier_points(segment_track, key_step, n_curve_segments):
 	track = []
 	for i1 in range(0, len(segment_track), 2*key_step):
 		i0 = prev_idx(i1, segment_track)
@@ -165,14 +209,15 @@ def get_bounding_box(point_list):
 			max_x = x
 		if y > max_y:
 			max_y = y
+	#round the min down and the max up to ints
+	min_x, min_y = int(min_x), int(min_y)
+	max_x, max_y = int(max_x+0.5), int(max_y+0.5)
 	w = max_x - min_x
 	h = max_y - min_y
 	return min_x, min_y, w, h
 
 
-def generate_track(width, height,
-				   n_key_points, n_segment_points,
-				   resample_segment_length):
+def generate_track(width, height, n_key_points, n_segment_points, resample_segment_length):
 	"""
 	can be quite expensive as only needs to run once
 	n_segment_points: needs to be >= 2, larger
@@ -204,17 +249,30 @@ def generate_track(width, height,
 	track, seg_dist = resample_track(track, resample_segment_length)
 	
 	dprint("checking dimensions")
-	x, y, w, h = get_bounding_box(key_points)
+	bx, by, bw, bh = get_bounding_box(key_points)
+	
+	# find centre
+	cx = bx + bw/2
+	cy = by + bw/2
 	
 	track_dict = {
 		"track": track,
-		"key_points": key_points,
+		"keys": key_points,
 		"seg_dist" : seg_dist,
-		"x": x, "y": y,
-		"w": w, "h": h
+		"cx": cx, "cy": cy, 
+		"bx": bx, "by": by,
+		"bw": bw, "bh": bh
 	}
-	dprint(f"generated track!\n{x}, {y}\n{w}x{h}")
+	dprint(f"generated track!\n{bx}, {by}\n{bw}x{bh}")
 	return track_dict
+
+
+def getCamera():
+	camera = {}
+	camera["transform"] = identity_matrix()
+	camera["filmwidth"] = 72
+	camera["filmheight"] = 40
+	return camera
 
 
 def debugDrawScene(key_points):
@@ -223,12 +281,26 @@ def debugDrawScene(key_points):
 		thumbyGraphics.display.setPixel(x, y, 1)
 
 
-def drawScene(camera, track, key_points):
+def drawScene(camera, track):
 	thumbyGraphics.display.fill(0) # Fill canvas to black
-	for i in range(0, len(track), 2):
-		x0, y0 = track[i], track[i+1]
-		i1 = next_idx(i, track)
-		x1, y1 = track[i1], track[i1+1]
+	points = track["track"]
+	key_points = track["keys"]
+	#####
+	
+	translate(camera, points[0], points[1])
+	
+	#model = identity_matrix()
+	
+	#view = camera["transform"]
+	
+	#project = camera["project"]
+	
+	
+	#####
+	for i in range(0, len(points), 2):
+		x0, y0 = points[i], points[i+1]
+		i1 = next_idx(i, points)
+		x1, y1 = points[i1], points[i1+1]
 		if on_screen(x0, y0) or on_screen(x1, y1):
 			if DEBUG_MODE and DEBUG_DOTS:
 				thumbyGraphics.display.setPixel(x0, y0, 1)
@@ -244,11 +316,10 @@ def main():
 	# Set the FPS (without this call, the default fps is 30)
 	thumbyGraphics.display.setFPS(60)
 	dprint("entering main loop")
+	camera = getCamera()
 	seed = time.ticks_cpu()
 	if DEBUG_MODE: seed = 0
 	random.seed(seed)
-	camera = transform_params.copy()
-	track_transform = transform_params.copy()
 	max_width = thumbyGraphics.display.width * 2
 	max_height = thumbyGraphics.display.height * 2
 	while(1):
@@ -256,16 +327,15 @@ def main():
 		   (max_width//2, max_width),
 		   (max_height//2, max_height),
 		   12, 2, 4)
-		track_points = [int(p) for p in track["track"]]
-		key_points = [int(p) for p in track["key_points"]]
-		drawScene(camera, track_points, key_points)
+		track["track"] = [int(p) for p in track["track"]]
+		track["keys"] = [int(p) for p in track["keys"]]
+		drawScene(camera, track)
 		while not thumbyButton.buttonA.justPressed():
 			#hold in loop until a is pressed
 			if thumbyButton.buttonB.justPressed():
 				#flip DEBUG DOTS
 				DEBUG_DOTS = not DEBUG_DOTS
-				drawScene(camera, track_points, key_points)
-			pass
+				drawScene(camera, track)
 
 
 main()
