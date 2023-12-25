@@ -148,7 +148,26 @@ def resample_track(in_track, segment_dist):
 			current_dist += fdist
 		current_dist -= seg_dist
 		x0, y0 = x1, y1
-	return track
+	return track, fdist
+
+
+def get_bounding_box(point_list):
+	min_x, min_y = point_list[0], point_list[1]
+	max_x, max_y = point_list[0], point_list[1]
+	# compare starting from second point
+	for i in range(2, len(point_list), 2):
+		x, y = point_list[i], point_list[i+1]
+		if x < min_x:
+			min_x = x
+		if y < min_y:
+			min_y = y
+		if x > max_x:
+			max_x = x
+		if y > max_y:
+			max_y = y
+	w = max_x - min_x
+	h = max_y - min_y
+	return min_x, min_y, w, h
 
 
 def generate_track(width, height,
@@ -169,19 +188,33 @@ def generate_track(width, height,
 	if not type(height) == int:
 		print("randomising height")
 		height = random.randint(height[0], height[1])
+	
 	dprint("generating key points")
 	key_points = generate_key_points(width, height,
 								n_key_points)
+	
 	dprint("generating mid points")
 	track = generate_mid_points(key_points, n_segment_points)
+	
 	dprint("generating bezier curves")
 	track = generate_quadratic_bezier_points(
-			track, n_segment_points, 6)
+			track, n_segment_points, 12)
 		
 	dprint("resampling")
-	track = resample_track(track, resample_segment_length)
-	dprint("generated track!")
-	return track, key_points
+	track, seg_dist = resample_track(track, resample_segment_length)
+	
+	dprint("checking dimensions")
+	x, y, w, h = get_bounding_box(key_points)
+	
+	track_dict = {
+		"track": track,
+		"key_points": key_points,
+		"seg_dist" : seg_dist,
+		"x": x, "y": y,
+		"w": w, "h": h
+	}
+	dprint(f"generated track!\n{x}, {y}\n{w}x{h}")
+	return track_dict
 
 
 def debugDrawScene(key_points):
@@ -216,21 +249,23 @@ def main():
 	random.seed(seed)
 	camera = transform_params.copy()
 	track_transform = transform_params.copy()
+	max_width = thumbyGraphics.display.width * 2
+	max_height = thumbyGraphics.display.height * 2
 	while(1):
-		track, key_points = generate_track(
-						   (thumbyGraphics.display.width//2,thumbyGraphics.display.width*2),
-						   (thumbyGraphics.display.height//2, thumbyGraphics.display.height*2),
-						   12, 2, 5)
-		track = [int(p) for p in track]
-		key_points = [int(p) for p in key_points]
-		print("drawing scene")
-		drawScene(camera, track, key_points)
+		track = generate_track(
+		   (max_width//2, max_width),
+		   (max_height//2, max_height),
+		   12, 2, 4)
+		track_points = [int(p) for p in track["track"]]
+		key_points = [int(p) for p in track["key_points"]]
+		drawScene(camera, track_points, key_points)
 		while not thumbyButton.buttonA.justPressed():
 			#hold in loop until a is pressed
 			if thumbyButton.buttonB.justPressed():
 				#flip DEBUG DOTS
 				DEBUG_DOTS = not DEBUG_DOTS
-				drawScene(camera, track, key_points)
+				drawScene(camera, track_points, key_points)
 			pass
+
 
 main()
