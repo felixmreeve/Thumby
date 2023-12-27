@@ -58,29 +58,45 @@ def matrix_multiply(a, b):
 	return c
 
 
-def translate(entity, x, y):
-	entity["transform"][2] += x
-	entity["transform"][5] += y
+def translate(entity, x, y, r=True):
+	transform = entity["transform"]
+	if r:
+		transform[2] += x
+		transform[5] += y
+	else:
+		transform[2] = x
+		transform[5] = y
 
 
-def rotate(entity, a):
+def rotate(entity, a, r=True):
 	sa = math.sin(a)
 	ca = math.cos(a)
-	mat = [
-		ca, -sa, 0,
-		sa,  ca, 0,
-		0,    0, 1
-	]
-	entity["transform"] = matrix_multiply(mat, entity["transform"]):
+	if r:
+		mat = [
+			ca, -sa, 0,
+			sa,  ca, 0,
+			0,    0, 1
+		]
+		entity["transform"] = matrix_multiply(mat, entity["transform"])
+	else:
+		transform = entity["transform"]
+		entity["transform"]
 
 
-def scale(entity, s):
-	mat = [
-		s, 0, 0,
-		0, s, 0,
-		0, 0, 1
-	]
-	entity["transform"] = matrix_multiply(mat, entity["transform"])
+def scale(entity, s, r=True):
+	if r:
+		mat = [
+			s, 0, 0,
+			0, s, 0,
+			0, 0, 1
+		]
+		entity["transform"] = matrix_multiply(mat, entity["transform"])
+	else:
+		entity["transform"][0] = s
+		entity["transform"][4] = s
+
+def get_translate(entity):
+	return entity["transform"][2], entity["transform"][5]
 
 
 def on_screen(x, y):
@@ -287,6 +303,7 @@ def drawScene(camera, track):
 	key_points = track["keys"]
 	#####
 	
+	
 	translate(camera, points[0], points[1])
 	
 	#model = identity_matrix()
@@ -297,17 +314,27 @@ def drawScene(camera, track):
 	
 	
 	#####
+	x, y = points[0:2]
+	camx, camy = get_translate(camera)
+	print(f"first point:{x}, {y}")
+	print(f"camera: {camx}, {camy}")
 	for i in range(0, len(points), 2):
 		x0, y0 = points[i], points[i+1]
 		i1 = next_idx(i, points)
 		x1, y1 = points[i1], points[i1+1]
+		x0 = int(x0 - camx)
+		y0 = int(y0 - camy)
+		x1 = int(x1 - camx)
+		y1 = int(y1 - camy)
+		
 		if on_screen(x0, y0) or on_screen(x1, y1):
 			if DEBUG_MODE and DEBUG_DOTS:
 				thumbyGraphics.display.setPixel(x0, y0, 1)
 			else:
 				thumbyGraphics.display.drawLine(x0, y0, x1, y1, 1)
 	if DEBUG_MODE and not DEBUG_DOTS:
-		debugDrawScene(key_points)
+		#debugDrawScene(key_points)
+		pass
 	thumbyGraphics.display.update()
 
 
@@ -327,8 +354,6 @@ def main():
 		   (max_width//2, max_width),
 		   (max_height//2, max_height),
 		   12, 2, 4)
-		track["track"] = [int(p) for p in track["track"]]
-		track["keys"] = [int(p) for p in track["keys"]]
 		drawScene(camera, track)
 		while not thumbyButton.buttonA.justPressed():
 			#hold in loop until a is pressed
