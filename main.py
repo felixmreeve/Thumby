@@ -10,7 +10,7 @@ import thumbyButton
 
 
 global DEBUG_MODE, DEBUG_DOTS
-DEBUG_MODE = True
+DEBUG_MODE = False
 DEBUG_DOTS = False
 
 
@@ -28,83 +28,27 @@ def prev_idx(i, track):
 	return (i-2) % len(track)
 
 
-# matrix: [
-# 0, 1, 2,
-# 3, 4, 5,
-# 6, 7, 8
-# ]
-
-
-def identity_matrix():
-	return [
-		1, 0, 0,
-		0, 1, 0,
-		0, 0, 1
-	]
-	
-def matrix_multiply(a, b):
-	c = [
-		a[0]*b[0] + a[1]*b[3] + a[2]*b[6],
-			a[0]*b[1] + a[1]*b[4] + a[2]*b[7],
-				a[0]*b[2] + a[1]*b[5] + a[2]*b[8],
-		a[3]*b[0] + a[4]*b[3] + a[5]*b[6],
-			a[3]*b[1] + a[4]*b[4] + a[5]*b[7],
-				a[3]*b[2] + a[4]*b[5] + a[5]*b[8],
-		# could probably hard code the last line
-		a[6]*b[0] + a[7]*b[3] + a[8]*b[6],
-			a[6]*b[1] + a[7]*b[4] + a[8]*b[7],
-				a[6]*b[2] + a[7]*b[5] + a[8]*b[8]
-	]
-	return c
-
-
-def translate(entity, x, y, r=True):
-	transform = entity["transform"]
-	if r:
-		transform[2] += x
-		transform[5] += y
-	else:
-		transform[2] = x
-		transform[5] = y
-
-
-def rotate(entity, a, r=True):
-	sa = math.sin(a)
-	ca = math.cos(a)
-	if r:
-		mat = [
-			ca, -sa, 0,
-			sa,  ca, 0,
-			0,    0, 1
-		]
-		entity["transform"] = matrix_multiply(mat, entity["transform"])
-	else:
-		transform = entity["transform"]
-		entity["transform"]
-
-
-def scale(entity, s, r=True):
-	if r:
-		mat = [
-			s, 0, 0,
-			0, s, 0,
-			0, 0, 1
-		]
-		entity["transform"] = matrix_multiply(mat, entity["transform"])
-	else:
-		entity["transform"][0] = s
-		entity["transform"][4] = s
-
-def get_translate(entity):
-	return entity["transform"][2], entity["transform"][5]
-
-
 def on_screen(x, y):
 	if 0 <= x < thumbyGraphics.display.width \
 	   and 0 <= y <thumbyGraphics.display.height:
 		   return True
 	else:
 		return False
+
+
+def translate(entity, x, y, r=False):
+	if r:
+		entity["x"] += x
+		entity["y"] += y
+	else:
+		entity["x"] = x
+		entity["y"] = y
+
+
+def view_transform(camera, x, y):
+	x1 = int(x - camera["x"] + camera["filmwidth"]/2)
+	y1 = int(y - camera["y"] + camera["filmheight"]/2)
+	return x1, y1
 
 
 def generate_key_points(width, height, n_key_points):
@@ -285,15 +229,21 @@ def generate_track(width, height, n_key_points, n_segment_points, resample_segme
 
 def getCamera():
 	camera = {}
-	camera["transform"] = identity_matrix()
+	camera["x"] = 0
+	camera["y"] = 0
+	camera["r"] = 0 # rotation
+	camera["s"] = 1 # scale
 	camera["filmwidth"] = 72
 	camera["filmheight"] = 40
 	return camera
 
 
-def debugDrawScene(key_points):
-	for i in range(0, len(key_points), 2):
+def debugDrawScene(camera, key_points):
+	camx, camy = get_view_transform(camera)
+	thumbyGraphics.display.drawRectangle(int(key_points[0]-1 + camx), int(key_points[1]-1 + camy), 3, 3, 1)
+	for i in range(2, len(key_points), 2):
 		x, y = key_points[i], key_points[i+1]
+		x, y = int(x + camx), int(y + camy)
 		thumbyGraphics.display.setPixel(x, y, 1)
 
 
@@ -314,18 +264,15 @@ def drawScene(camera, track):
 	
 	
 	#####
-	x, y = points[0:2]
-	camx, camy = get_translate(camera)
-	print(f"first point:{x}, {y}")
-	print(f"camera: {camx}, {camy}")
+	firstx, firsty = points[0:2]
+	camx, camy = get_view_transform(camera)
+	print(f"first point:{firstx}, {firsty}")
+	tx, ty = firstx+camx, firsty+camy
+	print(f"transformed: {tx}, {ty}")
 	for i in range(0, len(points), 2):
-		x0, y0 = points[i], points[i+1]
+		x0, y0 = view_transform(camera, points[i], points[i+1])
 		i1 = next_idx(i, points)
-		x1, y1 = points[i1], points[i1+1]
-		x0 = int(x0 - camx)
-		y0 = int(y0 - camy)
-		x1 = int(x1 - camx)
-		y1 = int(y1 - camy)
+		x1, y1 = view_transform(camera, points[i1], points[i1+1])
 		
 		if on_screen(x0, y0) or on_screen(x1, y1):
 			if DEBUG_MODE and DEBUG_DOTS:
@@ -333,7 +280,7 @@ def drawScene(camera, track):
 			else:
 				thumbyGraphics.display.drawLine(x0, y0, x1, y1, 1)
 	if DEBUG_MODE and not DEBUG_DOTS:
-		#debugDrawScene(key_points)
+		debugDrawScene(camera, key_points)
 		pass
 	thumbyGraphics.display.update()
 
