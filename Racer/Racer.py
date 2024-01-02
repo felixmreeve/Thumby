@@ -244,7 +244,13 @@ def generate_track(track_num, width, height, n_key_points, n_segment_points, res
 	cx = bx + bw/2
 	cy = by + bh/2
 	
+	dprint("naming track")
+	with open("../adjectives.txt") as f:
+		for line in f.lines():
+			print(line)
+	
 	track_dict = {
+		"name": name,
 		"track": track,
 		"keys": key_points,
 		"seg_dist" : seg_dist,
@@ -320,7 +326,7 @@ def draw(camera, track):
 		debugDrawScene(camera, track)
 		pass
 	
-	thumbyGraphics.display.drawText("TRACK NAME", 
+	thumbyGraphics.display.drawText("123456789012", 
 		0, thumbyGraphics.display.height - FONT_HEIGHT,
 		1)
 	thumbyGraphics.display.drawText("<",
