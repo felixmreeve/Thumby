@@ -8,6 +8,17 @@ import time
 import thumbyGraphics
 import thumbyButton
 
+# GLOBALS
+global FONT_WIDTH, FONT_HEIGHT
+FONT_WIDTH = 5
+FONT_HEIGHT = 7
+
+global SEED
+SEED = 0
+
+global TRACK_PREVIEW_SIZE
+TRACK_PREVIEW_SIZE = (thumbyGraphics.display.width - (FONT_WIDTH+1)*2,
+					  thumbyGraphics.display.height - (FONT_HEIGHT+1))
 
 global DEBUG_MODE, DEBUG_DOTS
 DEBUG_MODE = False
@@ -30,14 +41,14 @@ def prev_idx(i, track):
 
 def on_screen(x, y):
 	if 0 <= x < thumbyGraphics.display.width \
-	   and 0 <= y <thumbyGraphics.display.height:
+	and 0 <= y <thumbyGraphics.display.height:
 		   return True
 	else:
 		return False
 
 
-def translate(entity, x, y, r=False):
-	if r:
+def translate(entity, x, y, rel=False):
+	if rel:
 		entity["x"] += x
 		entity["y"] += y
 	else:
@@ -45,10 +56,24 @@ def translate(entity, x, y, r=False):
 		entity["y"] = y
 
 
+def scale(entity, s, rel=False):
+	if rel:
+		entity["s"] *= s
+	else:
+		entity["s"] = s
+
+
 def view_transform(camera, x, y):
-	x1 = int(x - camera["x"] + camera["filmwidth"]/2)
-	y1 = int(y - camera["y"] + camera["filmheight"]/2)
+	x1 = int((x - camera["x"])/camera["s"] + camera["filmwidth"]/2)
+	y1 = int((y - camera["y"])/camera["s"] + camera["filmheight"]/2)
 	return x1, y1
+	
+
+def init_random():
+	global DEBUG_MODE
+	SEED = time.ticks_cpu()
+	if DEBUG_MODE: SEED = 0
+	random.seed(SEED)
 
 
 def generate_key_points(width, height, n_key_points):
@@ -174,10 +199,14 @@ def get_bounding_box(point_list):
 	max_x, max_y = int(max_x+0.5), int(max_y+0.5)
 	w = max_x - min_x
 	h = max_y - min_y
+	
+	x_coords = sorted(point_list[::2])
+	y_coords = sorted(point_list[1::2])
+	
 	return min_x, min_y, w, h
 
 
-def generate_track(width, height, n_key_points, n_segment_points, resample_segment_length):
+def generate_track(track_num, width, height, n_key_points, n_segment_points, resample_segment_length):
 	"""
 	can be quite expensive as only needs to run once
 	n_segment_points: needs to be >= 2, larger
@@ -187,23 +216,23 @@ def generate_track(width, height, n_key_points, n_segment_points, resample_segme
 					  and less straights
 	"""
 	dprint("generating_track")
+	random.seed(SEED + track_num)
 	if not type(width) == int:
-		print("randomising width")
 		width = random.randint(width[0], width[1])
 	if not type(height) == int:
-		print("randomising height")
 		height = random.randint(height[0], height[1])
-	
+	dprint("random size: {}x{}".format(width, height))
 	dprint("generating key points")
-	key_points = generate_key_points(width, height,
-								n_key_points)
+	key_points = generate_key_points(
+		width, height,
+		n_key_points)
 	
 	dprint("generating mid points")
 	track = generate_mid_points(key_points, n_segment_points)
 	
 	dprint("generating bezier curves")
 	track = generate_quadratic_bezier_points(
-			track, n_segment_points, 12)
+		track, n_segment_points, 12)
 		
 	dprint("resampling")
 	track, seg_dist = resample_track(track, resample_segment_length)
@@ -213,13 +242,13 @@ def generate_track(width, height, n_key_points, n_segment_points, resample_segme
 	
 	# find centre
 	cx = bx + bw/2
-	cy = by + bw/2
+	cy = by + bh/2
 	
 	track_dict = {
 		"track": track,
 		"keys": key_points,
 		"seg_dist" : seg_dist,
-		"cx": cx, "cy": cy, 
+		"cx": cx, "cy": cy,
 		"bx": bx, "by": by,
 		"bw": bw, "bh": bh
 	}
@@ -238,37 +267,45 @@ def getCamera():
 	return camera
 
 
-def debugDrawScene(camera, key_points):
-	camx, camy = get_view_transform(camera)
-	thumbyGraphics.display.drawRectangle(int(key_points[0]-1 + camx), int(key_points[1]-1 + camy), 3, 3, 1)
+def update(camera, track):
+	global FONT_HEIGHT
+	global TRACK_PREVIEW_SIZE
+	
+	translate(camera, track["cx"], track["cy"])
+	width_scale = track["bw"] / TRACK_PREVIEW_SIZE[0]
+	height_scale = track["bh"] / TRACK_PREVIEW_SIZE[1]
+	cam_scale = max(width_scale, height_scale)
+	dprint("scale", cam_scale)
+	# translate up above text
+	translate(
+		camera,
+		0, cam_scale*(camera["filmheight"]-TRACK_PREVIEW_SIZE[1])/2,
+		rel=True)
+	scale(camera, cam_scale)
+
+
+def debugDrawScene(camera, track):
+	cx, cy = view_transform(camera, track["cx"], track["cy"])
+	thumbyGraphics.display.drawRectangle(cx-1, cy-1, 3, 3, 1)
+	key_points = track["keys"]
+	x0, y0 = view_transform(camera, key_points[0], key_points[1])
+	thumbyGraphics.display.drawRectangle(x0-1, y0-1, 3, 3, 1)
 	for i in range(2, len(key_points), 2):
-		x, y = key_points[i], key_points[i+1]
-		x, y = int(x + camx), int(y + camy)
+		x, y = view_transform(camera, key_points[i], key_points[i+1])
 		thumbyGraphics.display.setPixel(x, y, 1)
 
 
-def drawScene(camera, track):
+def draw(camera, track):
+	global DEBUG_MODE, DEBUG_DOTS
+	global FONT_WIDTH, FONT_HEIGHT
 	thumbyGraphics.display.fill(0) # Fill canvas to black
 	points = track["track"]
 	key_points = track["keys"]
-	#####
 	
-	
-	translate(camera, points[0], points[1])
-	
-	#model = identity_matrix()
-	
-	#view = camera["transform"]
-	
-	#project = camera["project"]
-	
-	
-	#####
 	firstx, firsty = points[0:2]
-	camx, camy = get_view_transform(camera)
-	print(f"first point:{firstx}, {firsty}")
-	tx, ty = firstx+camx, firsty+camy
-	print(f"transformed: {tx}, {ty}")
+	dprint(f"first point:{firstx}, {firsty}")
+	tx, ty = view_transform(camera, firstx, firsty)
+	dprint(f"transformed: {tx}, {ty}")
 	for i in range(0, len(points), 2):
 		x0, y0 = view_transform(camera, points[i], points[i+1])
 		i1 = next_idx(i, points)
@@ -280,34 +317,58 @@ def drawScene(camera, track):
 			else:
 				thumbyGraphics.display.drawLine(x0, y0, x1, y1, 1)
 	if DEBUG_MODE and not DEBUG_DOTS:
-		debugDrawScene(camera, key_points)
+		debugDrawScene(camera, track)
 		pass
+	
+	thumbyGraphics.display.drawText("TRACK NAME", 
+		0, thumbyGraphics.display.height - FONT_HEIGHT,
+		1)
+	thumbyGraphics.display.drawText("<",
+		0, (thumbyGraphics.display.height-FONT_HEIGHT)//2,
+		1)
+	thumbyGraphics.display.drawText(">",
+		thumbyGraphics.display.width-FONT_WIDTH,
+		(thumbyGraphics.display.height-FONT_HEIGHT)//2,
+		1)
 	thumbyGraphics.display.update()
 
 
 def main():
 	global DEBUG_DOTS
+	global FONT_WIDTH, FONT_HEIGHT
+
+	thumbyGraphics.display.setFont(
+		f"/lib/font{FONT_WIDTH}x{FONT_HEIGHT}.bin",
+		FONT_WIDTH, FONT_HEIGHT,
+		1)
 	# Set the FPS (without this call, the default fps is 30)
 	thumbyGraphics.display.setFPS(60)
-	dprint("entering main loop")
 	camera = getCamera()
-	seed = time.ticks_cpu()
-	if DEBUG_MODE: seed = 0
-	random.seed(seed)
-	max_width = thumbyGraphics.display.width * 2
-	max_height = thumbyGraphics.display.height * 2
-	while(1):
+	
+	max_width = thumbyGraphics.display.width * 10
+	max_height = thumbyGraphics.display.height * 10
+	dprint("entering main loop")
+	track_num = 0
+	while True:
 		track = generate_track(
-		   (max_width//2, max_width),
-		   (max_height//2, max_height),
-		   12, 2, 4)
-		drawScene(camera, track)
-		while not thumbyButton.buttonA.justPressed():
+			track_num,
+			(int(max_width * 0.8), max_width),
+			(int(max_height * 0.8), max_height),
+			12, 2, 10)
+		update(camera, track)
+		draw(camera, track)
+		while True:
+			if thumbyButton.buttonR.justPressed():
+				track_num += 1
+				break
+			if thumbyButton.buttonL.justPressed():
+				track_num -= 1
+				break
 			#hold in loop until a is pressed
-			if thumbyButton.buttonB.justPressed():
+			if DEBUG_MODE and thumbyButton.buttonB.justPressed():
 				#flip DEBUG DOTS
 				DEBUG_DOTS = not DEBUG_DOTS
-				drawScene(camera, track)
+				draw(camera, track)
 
-
-main()
+if __name__ == "__main__":
+	main()
