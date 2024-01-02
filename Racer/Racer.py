@@ -3,10 +3,12 @@
 import math
 import random
 import time
+from sys import print_exception
 
 #import thumby
-import thumbyGraphics
 import thumbyButton
+from thumbyGraphics import display as disp
+import thumbySprite
 
 # GLOBALS
 global FONT_WIDTH, FONT_HEIGHT
@@ -17,12 +19,27 @@ global SEED
 SEED = 0
 
 global TRACK_PREVIEW_SIZE
-TRACK_PREVIEW_SIZE = (thumbyGraphics.display.width - (FONT_WIDTH+1)*2,
-					  thumbyGraphics.display.height - (FONT_HEIGHT+1))
+TRACK_PREVIEW_SIZE = (disp.width - (FONT_WIDTH+1)*2,
+					  disp.height - (FONT_HEIGHT+1))
 
 global DEBUG_MODE, DEBUG_DOTS
 DEBUG_MODE = False
 DEBUG_DOTS = False
+
+
+def splash():
+	disp.fill(0)
+	disp.drawSprite(thumbySprite.Sprite(37,20,
+		bytearray([128,192,224,112,48,48,112,224,128,0,0,0,0,0,0,0,192,160,80,168,212,234,245,250,253,254,127,191,95,175,87,43,21,10,5,2,1,159,255,240,224,240,56,28,15,3,0,0,0,0,128,252,245,234,213,171,215,47,95,55,43,21,10,5,2,1,0,0,0,0,0,0,0,0,3,1,0,1,3,3,6,6,6,6,6,3,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
+		0,0,0))
+	disp.setFont("/lib/font8x8.bin",8,8,1)
+	disp.drawText("Ace",38,0,1)
+	disp.drawText("Racer",30,10,1)
+	disp.setFont("/lib/font5x7.bin",5,10,1)
+	disp.drawText("Text editor",3,22,1)
+	disp.drawText('A/B: Start',6,33,1)
+	while not thumbyButton.actionJustPressed():
+		disp.update()
 
 
 def dprint(*args, **kwargs):
@@ -40,8 +57,8 @@ def prev_idx(i, track):
 
 
 def on_screen(x, y):
-	if 0 <= x < thumbyGraphics.display.width \
-	and 0 <= y <thumbyGraphics.display.height:
+	if 0 <= x < disp.width \
+	and 0 <= y < disp.height:
 		   return True
 	else:
 		return False
@@ -206,6 +223,21 @@ def get_bounding_box(point_list):
 	return min_x, min_y, w, h
 
 
+def pick_line(file_name):
+	with open(file_name, encoding="utf-8") as f:
+		lines = f.read().splitlines()
+	return random.choice(lines)
+
+
+def generate_track_name():
+	adjectives_file = "/Games/Racer/words/adjectives.txt"
+	nouns_file = "/Games/Racer/words/nouns.txt"
+	adjective = pick_line(adjectives_file)
+	noun = pick_line(nouns_file)
+	name = f"{adjective} {noun}"
+	return name
+	
+
 def generate_track(track_num, width, height, n_key_points, n_segment_points, resample_segment_length):
 	"""
 	can be quite expensive as only needs to run once
@@ -245,9 +277,7 @@ def generate_track(track_num, width, height, n_key_points, n_segment_points, res
 	cy = by + bh/2
 	
 	dprint("naming track")
-	with open("../adjectives.txt") as f:
-		for line in f.lines():
-			print(line)
+	name = generate_track_name()
 	
 	track_dict = {
 		"name": name,
@@ -292,19 +322,19 @@ def update(camera, track):
 
 def debugDrawScene(camera, track):
 	cx, cy = view_transform(camera, track["cx"], track["cy"])
-	thumbyGraphics.display.drawRectangle(cx-1, cy-1, 3, 3, 1)
+	disp.drawRectangle(cx-1, cy-1, 3, 3, 1)
 	key_points = track["keys"]
 	x0, y0 = view_transform(camera, key_points[0], key_points[1])
-	thumbyGraphics.display.drawRectangle(x0-1, y0-1, 3, 3, 1)
+	disp.drawRectangle(x0-1, y0-1, 3, 3, 1)
 	for i in range(2, len(key_points), 2):
 		x, y = view_transform(camera, key_points[i], key_points[i+1])
-		thumbyGraphics.display.setPixel(x, y, 1)
+		disp.setPixel(x, y, 1)
 
 
 def draw(camera, track):
 	global DEBUG_MODE, DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
-	thumbyGraphics.display.fill(0) # Fill canvas to black
+	disp.fill(0) # Fill canvas to black
 	points = track["track"]
 	key_points = track["keys"]
 	
@@ -319,40 +349,40 @@ def draw(camera, track):
 		
 		if on_screen(x0, y0) or on_screen(x1, y1):
 			if DEBUG_MODE and DEBUG_DOTS:
-				thumbyGraphics.display.setPixel(x0, y0, 1)
+				disp.setPixel(x0, y0, 1)
 			else:
-				thumbyGraphics.display.drawLine(x0, y0, x1, y1, 1)
+				disp.drawLine(x0, y0, x1, y1, 1)
 	if DEBUG_MODE and not DEBUG_DOTS:
 		debugDrawScene(camera, track)
 		pass
 	
-	thumbyGraphics.display.drawText("123456789012", 
-		0, thumbyGraphics.display.height - FONT_HEIGHT,
+	disp.drawText(track["name"], 
+		0, disp.height - FONT_HEIGHT,
 		1)
-	thumbyGraphics.display.drawText("<",
-		0, (thumbyGraphics.display.height-FONT_HEIGHT)//2,
+	disp.drawText("<",
+		0, (disp.height-FONT_HEIGHT)//2,
 		1)
-	thumbyGraphics.display.drawText(">",
-		thumbyGraphics.display.width-FONT_WIDTH,
-		(thumbyGraphics.display.height-FONT_HEIGHT)//2,
+	disp.drawText(">",
+		disp.width-FONT_WIDTH,
+		(disp.height-FONT_HEIGHT)//2,
 		1)
-	thumbyGraphics.display.update()
+	disp.update()
 
 
 def main():
 	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
 
-	thumbyGraphics.display.setFont(
+	disp.setFont(
 		f"/lib/font{FONT_WIDTH}x{FONT_HEIGHT}.bin",
 		FONT_WIDTH, FONT_HEIGHT,
 		1)
 	# Set the FPS (without this call, the default fps is 30)
-	thumbyGraphics.display.setFPS(60)
+	disp.setFPS(60)
 	camera = getCamera()
 	
-	max_width = thumbyGraphics.display.width * 10
-	max_height = thumbyGraphics.display.height * 10
+	max_width = disp.width * 10
+	max_height = disp.height * 10
 	dprint("entering main loop")
 	track_num = 0
 	while True:
@@ -376,5 +406,18 @@ def main():
 				DEBUG_DOTS = not DEBUG_DOTS
 				draw(camera, track)
 
-if __name__ == "__main__":
+
+try:
+	splash()
 	main()
+except Exception as x:
+	try:
+		import emulator
+		print_exception(x)
+	except ImportError:
+		with open('/Games/Racer/crashdump.log','w',encoding="utf-8") as f:
+			print_exception(x,f)
+	disp.fill(0)
+	disp.drawText("Editor died",3,8,1)
+	disp.drawText("Problem was:",0,22,1)
+	#sideScroll(str(x),0,30,d.width,-1,{'A':lambda:hardware.reset(),'B':lambda:hardware.reset()})
