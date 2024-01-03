@@ -372,6 +372,8 @@ def draw(camera, track):
 def main():
 	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
+	
+	init_random()
 
 	disp.setFont(
 		f"/lib/font{FONT_WIDTH}x{FONT_HEIGHT}.bin",
