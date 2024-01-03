@@ -23,9 +23,6 @@ global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
 SCREEN_H = const(40)
 
-global SEED
-SEED = 0
-
 # track size will be roughly TRACK_SCALE * screensize
 global TRACK_SCALE
 TRACK_SCALE = const(10)
@@ -42,18 +39,18 @@ except ImportError:
 else:
 	EMULATOR = True
 
-# master debug flag
+# ********** master debug flag **********
 global DEBUG_MODE
-DEBUG_MODE = False #EMULATOR
+DEBUG_MODE = False
+# ***************************************
 # extra debug flags
 global DEBUG_ON_DEVICE, DEBUG_DOTS, DEBUG_FIXED_SEED, DEBUG_KEYS
 DEBUG_ON_DEVICE = False
 DEBUG_DOTS = False
-DEBUG_FIXED_SEED = True
+DEBUG_FIXED_SEED = False
 DEBUG_KEYS = False
-
-if not EMULATOR and not DEBUG_ON_DEVICE:
-	DEBUG_MODE = False
+if not EMULATOR :
+	DEBUG_MODE = DEBUG_ON_DEVICE
 
 
 def splash():
@@ -78,24 +75,26 @@ def splash():
 
 def load_data():
 	global GAME_NAME
-	global SEED
+	dprint("loading data")
 	save.setName(GAME_NAME)
 	# get seed
-	if save.hasItem("SEED"):
+	if save.hasItem("seed"):
 		dprint("loading seed")
-		SEED = save.getItem("SEED")
+		seed = save.getItem("seed")
 	# or set it up for first time
 	else:
-		dprint("generating seed")
-		SEED = time.ticks_cpu()
-		save.setItem("SEED", SEED)
-
-
-def init_random():
-	global DEBUG_MODE, DEBUG_FIXED_SEED
-	global SEED
-	seed = SEED
+		seed = time.ticks_cpu()
+		dprint(f"generating seed save {seed}")
+		save.setItem("seed", seed)
+		save.save()
 	if DEBUG_MODE and DEBUG_FIXED_SEED: seed = 0
+	data = {
+		"seed": seed
+	}
+	return data
+
+
+def init_random(seed):
 	dprint(f"initial seed is {seed}")
 	random.seed(seed)
 
@@ -344,7 +343,7 @@ def generate_track_name():
 	return name
 	
 
-def _generate_track(track_num, width, height, n_key_points, n_segment_points, resample_segment_length, preview_segment_length):
+def _generate_track(track_num, seed, width, height, n_key_points, n_segment_points, resample_segment_length, preview_segment_length):
 	"""
 	can be quite expensive as only needs to run infrequently
 	n_segment_points: needs to be >= 2, larger
@@ -354,14 +353,14 @@ def _generate_track(track_num, width, height, n_key_points, n_segment_points, re
 					  and less straights
 	"""
 	dprint("generating_track")
-	track_seed = SEED + track_num
+	track_seed = seed + track_num
 	dprint(f"with seed {track_seed}")
 	random.seed(track_seed)
 	
 	
 	dprint("naming track")
 	name = generate_track_name()
-	dprint(f"name: {name}")
+	dprint(f"name {name}")
 	# show name while track generates
 	# so that user doesn't get bored
 	disp.fill(0)
@@ -375,7 +374,6 @@ def _generate_track(track_num, width, height, n_key_points, n_segment_points, re
 	name_seed0 = int.from_bytes(name.split()[0].encode(), 'big')
 	name_seed1 = int.from_bytes(name.split()[1].encode(), 'big')
 	name_seed = name_seed0 + name_seed1
-	dprint(f"name_seed:{name_seed}")
 	random.seed(name_seed)
 	
 	if not type(width) == int:
@@ -423,7 +421,7 @@ def _generate_track(track_num, width, height, n_key_points, n_segment_points, re
 	return track_dict
 
 
-def generate_track(track_num):
+def generate_track(track_num, seed):
 	# wrapper around _generate_track
 	# so that consistent inputs can be set here
 	global TRACK_SCALE
@@ -433,7 +431,7 @@ def generate_track(track_num):
 	max_width = SCREEN_W * TRACK_SCALE
 	max_height = SCREEN_H * TRACK_SCALE
 	return _generate_track(
-		track_num,
+		track_num, seed,
 		(int(max_width * 0.8), max_width),
 		(int(max_height * 0.8), max_height),
 		12, 2,
@@ -531,11 +529,11 @@ def draw(camera, track):
 	disp.update()
 
 
-def track_select():
+def track_select(data):
 	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
 	
-	init_random()
+	#init_random()
 	default_font()
 	# Set the FPS (without this call, the default fps is 30)
 	# track selection is targeting low fps:
@@ -544,11 +542,11 @@ def track_select():
 	
 	dprint("entering track select loop")
 	track_num = 0
-	track = generate_track(track_num)
+	track = generate_track(track_num, data["seed"])
 	while True:
 		if thumbyButton.buttonR.justPressed():
 			track_num += 1
-			track = generate_track(track_num)
+			track = generate_track(track_num, data["seed"])
 		if track_num > 0 and thumbyButton.buttonL.justPressed():
 			track_num -= 1
 			track = generate_track(track_num)
@@ -565,7 +563,7 @@ def track_select():
 def main():
 	splash()
 	data = load_data()
-	track = track_select()
+	track = track_select(data)
 
 
 try:
