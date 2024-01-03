@@ -112,7 +112,6 @@ racer
 raid
 rails
 rains
-resrt
 rift
 river
 rocks
