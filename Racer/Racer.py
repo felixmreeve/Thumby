@@ -9,37 +9,93 @@ from sys import print_exception
 import thumbyButton
 from thumbyGraphics import display as disp
 import thumbySprite
-
+import thumbyHardware
 # GLOBALS
 global FONT_WIDTH, FONT_HEIGHT
-FONT_WIDTH = 5
-FONT_HEIGHT = 7
+FONT_WIDTH = const(5)
+FONT_HEIGHT = const(7)
+
+global SCREEN_W, SCREEN_H
+SCREEN_W = const(72)
+SCREEN_H = const(40)
 
 global SEED
 SEED = 0
 
-global TRACK_PREVIEW_SIZE
-TRACK_PREVIEW_SIZE = (disp.width - (FONT_WIDTH+1)*2,
-					  disp.height - (FONT_HEIGHT+1))
+# track size will be roughly TRACK_SCALE * screensize
+global TRACK_SCALE
+TRACK_SCALE = const(10)
 
-global DEBUG_MODE, DEBUG_DOTS
-DEBUG_MODE = False
+global TRACK_PREVIEW_W, TRACK_PREVIEW_H
+TRACK_PREVIEW_W = const(SCREEN_W - (FONT_WIDTH+1)*2)
+TRACK_PREVIEW_H = const(SCREEN_H - (FONT_HEIGHT+1))
+
+global EMULATOR
+try:
+	import emulator
+except ImportError:
+	EMULATOR = False
+else:
+	EMULATOR = True
+
+# master debug flag
+global DEBUG_MODE
+DEBUG_MODE = False #EMULATOR
+# extra debug flags
+global DEBUG_ON_DEVICE, DEBUG_DOTS, DEBUG_FIXED_SEED, DEBUG_KEYS
+DEBUG_ON_DEVICE = False
 DEBUG_DOTS = False
+DEBUG_FIXED_SEED = True
+DEBUG_KEYS = False
+
+if not EMULATOR and not DEBUG_ON_DEVICE:
+	DEBUG_MODE = False
 
 
 def splash():
 	disp.fill(0)
-	disp.drawSprite(thumbySprite.Sprite(37,20,
-		bytearray([128,192,224,112,48,48,112,224,128,0,0,0,0,0,0,0,192,160,80,168,212,234,245,250,253,254,127,191,95,175,87,43,21,10,5,2,1,159,255,240,224,240,56,28,15,3,0,0,0,0,128,252,245,234,213,171,215,47,95,55,43,21,10,5,2,1,0,0,0,0,0,0,0,0,3,1,0,1,3,3,6,6,6,6,6,3,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
-		0,0,0))
+	"""
+	# BITMAP: width: 32, height: 32
+	disp.drawSprite(thumbySprite.Sprite(32, 32,
+		bytearray([0,128,224,240,240,248,248,61,29,31,14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+			0,1,3,7,7,15,15,15,14,14,14,12,12,12,28,28,28,60,60,124,252,248,248,248,240,240,224,224,192,192,128,0,
+			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,195,255,255,255,255,255,255,255,255,255,254,
+			0,0,0,0,0,192,192,224,224,240,240,240,248,248,248,252,252,252,254,254,255,127,127,63,63,31,31,15,15,3,1,0]),
+		0, 0, 0))
+	"""
 	disp.setFont("/lib/font8x8.bin",8,8,1)
-	disp.drawText("Ace",38,0,1)
+	disp.drawText("Axel",38,0,1)
 	disp.drawText("Racer",30,10,1)
 	disp.setFont("/lib/font5x7.bin",5,10,1)
-	disp.drawText("Text editor",3,22,1)
-	disp.drawText('A/B: Start',6,33,1)
+	disp.drawText('A: start',6,33,1)
 	while not thumbyButton.actionJustPressed():
 		disp.update()
+
+
+def load_data():
+	pass
+
+def displayError(msg):
+	disp.setFPS(60)
+	default_font()
+	msg = str(msg)
+	x0 = 0
+	y0 = 32
+	w = SCREEN_W
+	msg_len=len(msg)*6+w
+	pos=0
+	disp.drawText("Thumby crash", 0, 0, 1)
+	disp.drawText(" * Error: * ", 0, 16, 1)
+	while True:
+		msg_x = x0 + SCREEN_W - pos
+		disp.drawFilledRectangle(x0, y0, SCREEN_W, 8, 0)
+		disp.drawText(msg, msg_x, y0, 1)
+		disp.update()
+		pos += 1
+		pos %= msg_len
+		if thumbyButton.buttonA.justPressed() \
+			or thumbyButton.buttonB.justPressed():
+			thumbyHardware.reset()
 
 
 def dprint(*args, **kwargs):
@@ -57,8 +113,9 @@ def prev_idx(i, track):
 
 
 def on_screen(x, y):
-	if 0 <= x < disp.width \
-	and 0 <= y < disp.height:
+	global SCREEN_W, SCREEN_H
+	if 0 <= x < SCREEN_W \
+	and 0 <= y < SCREEN_H:
 		   return True
 	else:
 		return False
@@ -84,13 +141,45 @@ def view_transform(camera, x, y):
 	x1 = int((x - camera["x"])/camera["s"] + camera["filmwidth"]/2)
 	y1 = int((y - camera["y"])/camera["s"] + camera["filmheight"]/2)
 	return x1, y1
+
+
+def normalise(x, y):
+	v_len = math.sqrt(x*x + y*y)
+	return x/v_len, y/v_len
+
+
+def get_tangent(x0, y0, x1, y1):
+	dx = x1 - x0
+	dy = y1 - y0
+	return normalise(dx, dy)
+
+
+def get_normal_out(x0, y0, x1, y1):
+	dx = x1 - x0
+	dy = y1 - y0
+	return normalise(-dy, dx)
 	
+	
+def get_normal_in(x0, y0, x1, y1):
+	dx = x1 - x0
+	dy = y1 - y0
+	return normalise(dy, -dx)
+
 
 def init_random():
-	global DEBUG_MODE
+	global DEBUG_MODE, DEBUG_FIXED_SEED
+	global SEED
 	SEED = time.ticks_cpu()
-	if DEBUG_MODE: SEED = 0
+	if DEBUG_MODE and DEBUG_FIXED_SEED: SEED = 0
+	dprint(f"initial seed is {SEED}")
 	random.seed(SEED)
+
+
+def default_font():
+	disp.setFont(
+		f"/lib/font{FONT_WIDTH}x{FONT_HEIGHT}.bin",
+		FONT_WIDTH, FONT_HEIGHT,
+		1)
 
 
 def generate_key_points(width, height, n_key_points):
@@ -238,9 +327,9 @@ def generate_track_name():
 	return name
 	
 
-def generate_track(track_num, width, height, n_key_points, n_segment_points, resample_segment_length):
+def _generate_track(track_num, width, height, n_key_points, n_segment_points, resample_segment_length, preview_segment_length):
 	"""
-	can be quite expensive as only needs to run once
+	can be quite expensive as only needs to run infrequently
 	n_segment_points: needs to be >= 2, larger
 					  numbers bias curve tighter
 					  to corner, lower numbers lead
@@ -248,7 +337,30 @@ def generate_track(track_num, width, height, n_key_points, n_segment_points, res
 					  and less straights
 	"""
 	dprint("generating_track")
-	random.seed(SEED + track_num)
+	track_seed = SEED + track_num
+	dprint(f"with seed {track_seed}")
+	random.seed(track_seed)
+	
+	
+	dprint("naming track")
+	name = generate_track_name()
+	dprint(f"name: {name}")
+	# show name while track generates
+	# so that user doesn't get bored
+	disp.fill(0)
+	drawTrackUI(name, track_num)
+	disp.update()
+	
+	# if we use the name as the seed
+	# we can share tracks via the name
+	# add seed together from first/second part
+	# to avoid one word overriding seed
+	name_seed0 = int.from_bytes(name.split()[0].encode(), 'big')
+	name_seed1 = int.from_bytes(name.split()[1].encode(), 'big')
+	name_seed = name_seed0 + name_seed1
+	dprint(f"name_seed:{name_seed}")
+	random.seed(name_seed)
+	
 	if not type(width) == int:
 		width = random.randint(width[0], width[1])
 	if not type(height) == int:
@@ -269,6 +381,9 @@ def generate_track(track_num, width, height, n_key_points, n_segment_points, res
 	dprint("resampling")
 	track, seg_dist = resample_track(track, resample_segment_length)
 	
+	dprint("generating preview")
+	preview_points, preview_seg_dist = resample_track(track, preview_segment_length)
+	
 	dprint("checking dimensions")
 	bx, by, bw, bh = get_bounding_box(key_points)
 	
@@ -276,13 +391,12 @@ def generate_track(track_num, width, height, n_key_points, n_segment_points, res
 	cx = bx + bw/2
 	cy = by + bh/2
 	
-	dprint("naming track")
-	name = generate_track_name()
-	
 	track_dict = {
+		"num": track_num,
 		"name": name,
 		"track": track,
 		"keys": key_points,
+		"preview": preview_points,
 		"seg_dist" : seg_dist,
 		"cx": cx, "cy": cy,
 		"bx": bx, "by": by,
@@ -290,6 +404,23 @@ def generate_track(track_num, width, height, n_key_points, n_segment_points, res
 	}
 	dprint(f"generated track!\n{bx}, {by}\n{bw}x{bh}")
 	return track_dict
+
+
+def generate_track(track_num):
+	# wrapper around _generate_track
+	# so that consistent inputs can be set here
+	global TRACK_SCALE
+	# preview_segment_length will be roughly X pixels onscreen
+	# if set to X * TRACK_SCALE
+	preview_segment_length = 2 * TRACK_SCALE
+	max_width = SCREEN_W * TRACK_SCALE
+	max_height = SCREEN_H * TRACK_SCALE
+	return _generate_track(
+		track_num,
+		(int(max_width * 0.8), max_width),
+		(int(max_height * 0.8), max_height),
+		12, 2,
+		10, preview_segment_length)
 
 
 def getCamera():
@@ -305,121 +436,127 @@ def getCamera():
 
 def update(camera, track):
 	global FONT_HEIGHT
-	global TRACK_PREVIEW_SIZE
+	global TRACK_PREVIEW_W, TRACK_PREVIEW_H
 	
 	translate(camera, track["cx"], track["cy"])
-	width_scale = track["bw"] / TRACK_PREVIEW_SIZE[0]
-	height_scale = track["bh"] / TRACK_PREVIEW_SIZE[1]
+	width_scale = track["bw"] / TRACK_PREVIEW_W
+	height_scale = track["bh"] / TRACK_PREVIEW_H
 	cam_scale = max(width_scale, height_scale)
-	dprint("scale", cam_scale)
 	# translate up above text
 	translate(
 		camera,
-		0, cam_scale*(camera["filmheight"]-TRACK_PREVIEW_SIZE[1])/2,
+		0, cam_scale*(camera["filmheight"]-TRACK_PREVIEW_H)/2,
 		rel=True)
 	scale(camera, cam_scale)
 
 
+def drawTrackUI(name, track_num):
+	global FONT_WIDTH, FONT_HEIGHT
+	disp.drawText(name,
+		0, SCREEN_H - FONT_HEIGHT,
+		1)
+	if track_num > 0:
+		disp.drawText("<",
+			0, (SCREEN_H - FONT_HEIGHT) // 2,
+			1)
+	disp.drawText(">",
+		SCREEN_W - FONT_WIDTH,
+		(SCREEN_H - FONT_HEIGHT) // 2,
+		1)
+
+
 def debugDrawScene(camera, track):
+	global DEBUG_KEYS
+	# draw box in centre
 	cx, cy = view_transform(camera, track["cx"], track["cy"])
 	disp.drawRectangle(cx-1, cy-1, 3, 3, 1)
-	key_points = track["keys"]
-	x0, y0 = view_transform(camera, key_points[0], key_points[1])
-	disp.drawRectangle(x0-1, y0-1, 3, 3, 1)
-	for i in range(2, len(key_points), 2):
-		x, y = view_transform(camera, key_points[i], key_points[i+1])
-		disp.setPixel(x, y, 1)
+	if DEBUG_KEYS:
+		# draw key points
+		key_points = track["keys"]
+		x0, y0 = view_transform(camera, key_points[0], key_points[1])
+		disp.drawRectangle(x0-1, y0-1, 3, 3, 1)
+		for i in range(2, len(key_points), 2):
+			x, y = view_transform(camera, key_points[i], key_points[i+1])
+			disp.setPixel(x, y, 1)
+
+
+def drawStartLine(x0, y0, x1, y1):
+	nx, ny = get_normal_in(x0, y0, x1, y1)
+	nx = int(2.5 * nx)
+	ny = int(2.5 * ny)
+	#disp.drawLine(x0-nx, y0-ny, x0+nx, y0+ny, 1)
+	disp.setPixel(x0-nx, y0-ny, 1)
+	disp.setPixel(x0+nx, y0+ny, 1)
 
 
 def draw(camera, track):
 	global DEBUG_MODE, DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
 	disp.fill(0) # Fill canvas to black
-	points = track["track"]
+	points = track["preview"]
 	key_points = track["keys"]
 	
-	firstx, firsty = points[0:2]
-	dprint(f"first point:{firstx}, {firsty}")
-	tx, ty = view_transform(camera, firstx, firsty)
-	dprint(f"transformed: {tx}, {ty}")
 	for i in range(0, len(points), 2):
 		x0, y0 = view_transform(camera, points[i], points[i+1])
 		i1 = next_idx(i, points)
 		x1, y1 = view_transform(camera, points[i1], points[i1+1])
 		
 		if on_screen(x0, y0) or on_screen(x1, y1):
+			if i == 0:
+				drawStartLine(x0, y0, x1, y1)
 			if DEBUG_MODE and DEBUG_DOTS:
 				disp.setPixel(x0, y0, 1)
 			else:
 				disp.drawLine(x0, y0, x1, y1, 1)
 	if DEBUG_MODE and not DEBUG_DOTS:
 		debugDrawScene(camera, track)
-		pass
-	
-	disp.drawText(track["name"], 
-		0, disp.height - FONT_HEIGHT,
-		1)
-	disp.drawText("<",
-		0, (disp.height-FONT_HEIGHT)//2,
-		1)
-	disp.drawText(">",
-		disp.width-FONT_WIDTH,
-		(disp.height-FONT_HEIGHT)//2,
-		1)
+	drawTrackUI(track["name"], track["num"])
 	disp.update()
 
 
-def main():
+def track_select():
 	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
 	
 	init_random()
-
-	disp.setFont(
-		f"/lib/font{FONT_WIDTH}x{FONT_HEIGHT}.bin",
-		FONT_WIDTH, FONT_HEIGHT,
-		1)
+	default_font()
 	# Set the FPS (without this call, the default fps is 30)
-	disp.setFPS(60)
+	# track selection is targeting low fps:
+	disp.setFPS(15)
 	camera = getCamera()
 	
-	max_width = disp.width * 10
-	max_height = disp.height * 10
-	dprint("entering main loop")
+	dprint("entering track select loop")
 	track_num = 0
+	track = generate_track(track_num)
 	while True:
-		track = generate_track(
-			track_num,
-			(int(max_width * 0.8), max_width),
-			(int(max_height * 0.8), max_height),
-			12, 2, 10)
+		if thumbyButton.buttonR.justPressed():
+			track_num += 1
+			track = generate_track(track_num)
+		if track_num > 0 and thumbyButton.buttonL.justPressed():
+			track_num -= 1
+			track = generate_track(track_num)
+		#hold in loop until a is pressed
+		if thumbyButton.buttonA.justPressed():
+			return track
+		if DEBUG_MODE and thumbyButton.buttonB.justPressed():
+			#flip DEBUG DOTS
+			DEBUG_DOTS = not DEBUG_DOTS
 		update(camera, track)
 		draw(camera, track)
-		while True:
-			if thumbyButton.buttonR.justPressed():
-				track_num += 1
-				break
-			if thumbyButton.buttonL.justPressed():
-				track_num -= 1
-				break
-			#hold in loop until a is pressed
-			if DEBUG_MODE and thumbyButton.buttonB.justPressed():
-				#flip DEBUG DOTS
-				DEBUG_DOTS = not DEBUG_DOTS
-				draw(camera, track)
+
+
+def main():
+	splash()
+	data = load_data()
+	track = track_select()
 
 
 try:
-	splash()
 	main()
 except Exception as x:
-	try:
-		import emulator
+	if EMULATOR:
 		print_exception(x)
-	except ImportError:
+	else:
 		with open('/Games/Racer/crashdump.log','w',encoding="utf-8") as f:
 			print_exception(x,f)
-	disp.fill(0)
-	disp.drawText("Editor died",3,8,1)
-	disp.drawText("Problem was:",0,22,1)
-	#sideScroll(str(x),0,30,d.width,-1,{'A':lambda:hardware.reset(),'B':lambda:hardware.reset()})
+	displayError(x)
