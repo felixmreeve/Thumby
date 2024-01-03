@@ -8,9 +8,13 @@ from sys import print_exception
 #import thumby
 import thumbyButton
 from thumbyGraphics import display as disp
+from thumbySaves import saveData as save
 import thumbySprite
 import thumbyHardware
 # GLOBALS
+global GAME_NAME
+GAME_NAME = "AxisRacer"
+
 global FONT_WIDTH, FONT_HEIGHT
 FONT_WIDTH = const(5)
 FONT_HEIGHT = const(7)
@@ -64,8 +68,8 @@ def splash():
 		0, 0, 0))
 	"""
 	disp.setFont("/lib/font8x8.bin",8,8,1)
-	disp.drawText("Axel",38,0,1)
-	disp.drawText("Racer",30,10,1)
+	disp.drawText("aXis",38,0,1)
+	disp.drawText("raCer",30,10,1)
 	disp.setFont("/lib/font5x7.bin",5,10,1)
 	disp.drawText('A: start',6,33,1)
 	while not thumbyButton.actionJustPressed():
@@ -73,7 +77,28 @@ def splash():
 
 
 def load_data():
-	pass
+	global GAME_NAME
+	global SEED
+	save.setName(GAME_NAME)
+	# get seed
+	if save.hasItem("SEED"):
+		dprint("loading seed")
+		SEED = save.getItem("SEED")
+	# or set it up for first time
+	else:
+		dprint("generating seed")
+		SEED = time.ticks_cpu()
+		save.setItem("SEED", SEED)
+
+
+def init_random():
+	global DEBUG_MODE, DEBUG_FIXED_SEED
+	global SEED
+	seed = SEED
+	if DEBUG_MODE and DEBUG_FIXED_SEED: seed = 0
+	dprint(f"initial seed is {seed}")
+	random.seed(seed)
+
 
 def displayError(msg):
 	disp.setFPS(60)
@@ -94,7 +119,7 @@ def displayError(msg):
 		pos += 1
 		pos %= msg_len
 		if thumbyButton.buttonA.justPressed() \
-			or thumbyButton.buttonB.justPressed():
+		or thumbyButton.buttonB.justPressed():
 			thumbyHardware.reset()
 
 
@@ -164,15 +189,6 @@ def get_normal_in(x0, y0, x1, y1):
 	dx = x1 - x0
 	dy = y1 - y0
 	return normalise(dy, -dx)
-
-
-def init_random():
-	global DEBUG_MODE, DEBUG_FIXED_SEED
-	global SEED
-	SEED = time.ticks_cpu()
-	if DEBUG_MODE and DEBUG_FIXED_SEED: SEED = 0
-	dprint(f"initial seed is {SEED}")
-	random.seed(SEED)
 
 
 def default_font():
@@ -319,8 +335,9 @@ def pick_line(file_name):
 
 
 def generate_track_name():
-	adjectives_file = "/Games/Racer/words/adjectives.txt"
-	nouns_file = "/Games/Racer/words/nouns.txt"
+	global GAME_NAME
+	adjectives_file = f"/Games/{GAME_NAME}/words/adjectives.txt"
+	nouns_file = f"/Games/{GAME_NAME}/words/nouns.txt"
 	adjective = pick_line(adjectives_file)
 	noun = pick_line(nouns_file)
 	name = f"{adjective} {noun}"
