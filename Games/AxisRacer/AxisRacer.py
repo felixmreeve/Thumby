@@ -57,7 +57,8 @@ def splash():
 	disp.fill(0)
 	"""
 	# BITMAP: width: 32, height: 32
-	disp.drawSprite(thumbySprite.Sprite(32, 32,
+	disp.drawSprite(
+		thumbySprite.Sprite(32, 32,
 		bytearray([0,128,224,240,240,248,248,61,29,31,14,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 			0,1,3,7,7,15,15,15,14,14,14,12,12,12,28,28,28,60,60,124,252,248,248,248,240,240,224,224,192,192,128,0,
 			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,195,255,255,255,255,255,255,255,255,255,254,
@@ -108,6 +109,7 @@ def displayError(msg):
 	w = SCREEN_W
 	msg_len=len(msg)*6+w
 	pos=0
+	disp.fill(0)
 	disp.drawText("Thumby crash", 0, 0, 1)
 	disp.drawText(" * Error: * ", 0, 16, 1)
 	while True:
@@ -529,7 +531,7 @@ def draw(camera, track):
 	disp.update()
 
 
-def track_select(data):
+def track_select(seed):
 	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
 	
@@ -542,14 +544,14 @@ def track_select(data):
 	
 	dprint("entering track select loop")
 	track_num = 0
-	track = generate_track(track_num, data["seed"])
+	track = generate_track(track_num, seed)
 	while True:
 		if thumbyButton.buttonR.justPressed():
 			track_num += 1
-			track = generate_track(track_num, data["seed"])
+			track = generate_track(track_num, seed)
 		if track_num > 0 and thumbyButton.buttonL.justPressed():
 			track_num -= 1
-			track = generate_track(track_num)
+			track = generate_track(track_num, seed)
 		#hold in loop until a is pressed
 		if thumbyButton.buttonA.justPressed():
 			return track
@@ -563,7 +565,7 @@ def track_select(data):
 def main():
 	splash()
 	data = load_data()
-	track = track_select(data)
+	track = track_select(data["seed"])
 
 
 try:
