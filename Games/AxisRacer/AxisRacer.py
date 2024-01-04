@@ -15,9 +15,12 @@ import thumbyHardware
 global GAME_NAME
 GAME_NAME = "AxisRacer"
 
-global FONT_WIDTH, FONT_HEIGHT
-FONT_WIDTH = const(5)
-FONT_HEIGHT = const(7)
+global FONT_W, FONT_H
+FONT_W = const(5)
+FONT_H = const(7)
+global MINI_FONT_W, MINI_FONT_H
+MINI_FONT_W = const(3)
+MINI_FONT_H = const(5)
 
 global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
@@ -28,8 +31,8 @@ global TRACK_SCALE
 TRACK_SCALE = const(10)
 
 global TRACK_PREVIEW_W, TRACK_PREVIEW_H
-TRACK_PREVIEW_W = const(SCREEN_W - (FONT_WIDTH+1)*2)
-TRACK_PREVIEW_H = const(SCREEN_H - (FONT_HEIGHT+1))
+TRACK_PREVIEW_W = const(SCREEN_W - (FONT_W+1)*2)
+TRACK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
 
 global EMULATOR
 try:
@@ -41,7 +44,7 @@ else:
 
 # ********** master debug flag **********
 global DEBUG_MODE
-DEBUG_MODE = False
+DEBUG_MODE = True
 # ***************************************
 # extra debug flags
 global DEBUG_ON_DEVICE, DEBUG_DOTS, DEBUG_FIXED_SEED, DEBUG_KEYS
@@ -74,35 +77,108 @@ def splash():
 		disp.update()
 
 
+def no_faves_splash():
+	disp.fill(0)
+	set_font(FONT_W, FONT_H)
+	disp.drawText("no faves!", 0, 0, 1)
+	disp.drawText("B: exit", 0, SCREEN_H-FONT_H, 1)
+	set_font(MINI_FONT_W, MINI_FONT_H)
+	disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
+	disp.drawText("fave tracks", FONT_W*2, SCREEN_H//2, 1)
+	while not thumbyButton.buttonB.justPressed():
+		disp.update()
+
+
+def end_faves_splash():
+	disp.fill(0)
+	set_font(FONT_W, FONT_H)
+	disp.drawText("no more!", 0, 0, 1)
+	disp.drawText("<", 0, (SCREEN_H - FONT_H) // 2, 1)
+	disp.drawText("B: exit", 0, SCREEN_H-FONT_H, 1)
+	set_font(MINI_FONT_W, MINI_FONT_H)
+	disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
+	disp.drawText("fave tracks", FONT_W*2, SCREEN_H//2, 1)
+	while not thumbyButton.buttonL.justPressed():
+		disp.update()
+
+
 def load_data():
 	global GAME_NAME
+	global DEBUG_MODE, DEBUG_FIXED_SEED
 	dprint("loading data")
 	save.setName(GAME_NAME)
-	# get seed
+	updated = False
+	
 	if save.hasItem("seed"):
 		dprint("loading seed")
 		seed = save.getItem("seed")
-	# or set it up for first time
+	
 	else:
 		seed = time.ticks_cpu()
 		dprint(f"generating seed save {seed}")
 		save.setItem("seed", seed)
+		updated = True
+		
+	if save.hasItem("fave_names"):
+		fave_names = save.getItem("fave_names")
+	else:
+		fave_names = []
+		save.setItem("fave_names", fave_names)
+		updated = True
+	
+	if updated:
 		save.save()
+	
 	if DEBUG_MODE and DEBUG_FIXED_SEED: seed = 0
 	data = {
-		"seed": seed
+		"seed": seed,
+		"fave_names": fave_names
 	}
 	return data
 
 
-def init_random(seed):
-	dprint(f"initial seed is {seed}")
-	random.seed(seed)
+def menu(*choices, selection=0):
+	# mini font? or main font?
+	# how many to display / scroll?
+	set_font(FONT_W, FONT_H)
+	while True:
+		# input
+		if thumbyButton.buttonD.justPressed():
+			selection += 1
+		if thumbyButton.buttonU.justPressed():
+			selection -= 1
+		if thumbyButton.buttonA.justPressed():
+			return selection # int
+		if thumbyButton.buttonB.justPressed():
+			return -1 # back out
+		selection %= len(choices)
+		# draw
+		disp.fill(0)
+		for i, choice in enumerate(choices):
+			col = 1
+			y = (SCREEN_H)//2 - FONT_H + (i-selection) * (FONT_H+1)
+			if i == selection:
+				col = 0
+				disp.drawFilledRectangle(0, y-1, SCREEN_W, FONT_H+2, 1)
+			disp.drawText(choice, 1, y, col)
+		disp.update()
+	return
 
 
-def displayError(msg):
+def toggle_fave(data, track):
+	track_name = track["name"]
+	fave_names = data["fave_names"]
+	if track_name in fave_names:
+		track["fave"] = False
+		fave_names.remove(track_name)
+	else:
+		track["fave"] = True
+		fave_names.append(track_name)
+	save.save()
+
+def display_error(msg):
 	disp.setFPS(60)
-	default_font()
+	set_font(FONT_W, FONT_H)
 	msg = str(msg)
 	x0 = 0
 	y0 = 32
@@ -192,10 +268,10 @@ def get_normal_in(x0, y0, x1, y1):
 	return normalise(dy, -dx)
 
 
-def default_font():
+def set_font(w, h):
 	disp.setFont(
-		f"/lib/font{FONT_WIDTH}x{FONT_HEIGHT}.bin",
-		FONT_WIDTH, FONT_HEIGHT,
+		f"/lib/font{w}x{h}.bin",
+		w, h,
 		1)
 
 
@@ -345,7 +421,7 @@ def generate_track_name():
 	return name
 	
 
-def _generate_track(track_num, seed, width, height, n_key_points, n_segment_points, resample_segment_length, preview_segment_length):
+def _generate_track(track_num, name_seed, fave, width, height, n_key_points, n_segment_points, resample_segment_length, preview_segment_length):
 	"""
 	can be quite expensive as only needs to run infrequently
 	n_segment_points: needs to be >= 2, larger
@@ -354,29 +430,20 @@ def _generate_track(track_num, seed, width, height, n_key_points, n_segment_poin
 					  to wavier, smoother curves
 					  and less straights
 	"""
-	dprint("generating_track")
-	track_seed = seed + track_num
-	dprint(f"with seed {track_seed}")
-	random.seed(track_seed)
-	
-	
-	dprint("naming track")
-	name = generate_track_name()
-	dprint(f"name {name}")
 	# show name while track generates
 	# so that user doesn't get bored
 	disp.fill(0)
-	drawTrackUI(name, track_num)
+	draw_track_ui(name_seed, track_num, fave)
 	disp.update()
 	
 	# if we use the name as the seed
 	# we can share tracks via the name
 	# add seed together from first/second part
 	# to avoid one word overriding seed
-	name_seed0 = int.from_bytes(name.split()[0].encode(), 'big')
-	name_seed1 = int.from_bytes(name.split()[1].encode(), 'big')
-	name_seed = name_seed0 + name_seed1
-	random.seed(name_seed)
+	name_seed_part1 = int.from_bytes(name_seed.split()[0].encode(), 'big')
+	name_seed_part2 = int.from_bytes(name_seed.split()[1].encode(), 'big')
+	name_seed_int = name_seed_part1 + name_seed_part2
+	random.seed(name_seed_int)
 	
 	if not type(width) == int:
 		width = random.randint(width[0], width[1])
@@ -392,6 +459,10 @@ def _generate_track(track_num, seed, width, height, n_key_points, n_segment_poin
 	track = generate_mid_points(key_points, n_segment_points)
 	
 	dprint("generating bezier curves")
+	# TODO: think about cubic bezier for smoother corners
+	# but maybe more boring?
+	# would require generating mid points between tangent
+	# points, not all points
 	track = generate_quadratic_bezier_points(
 		track, n_segment_points, 12)
 		
@@ -410,7 +481,8 @@ def _generate_track(track_num, seed, width, height, n_key_points, n_segment_poin
 	
 	track_dict = {
 		"num": track_num,
-		"name": name,
+		"name": name_seed,
+		"fave": fave,
 		"track": track,
 		"keys": key_points,
 		"preview": preview_points,
@@ -423,7 +495,7 @@ def _generate_track(track_num, seed, width, height, n_key_points, n_segment_poin
 	return track_dict
 
 
-def generate_track(track_num, seed):
+def generate_track(data, track_num, from_faves=False):
 	# wrapper around _generate_track
 	# so that consistent inputs can be set here
 	global TRACK_SCALE
@@ -432,15 +504,34 @@ def generate_track(track_num, seed):
 	preview_segment_length = 2 * TRACK_SCALE
 	max_width = SCREEN_W * TRACK_SCALE
 	max_height = SCREEN_H * TRACK_SCALE
+	
+	dprint("generating_track")
+	if from_faves:
+		name = data["fave_names"][track_num]
+	else:
+		track_seed = data["seed"] + track_num
+		dprint(f"with seed {track_seed}")
+		random.seed(track_seed)
+		
+		dprint("naming track")
+		name = generate_track_name()
+	
+	if name in data["fave_names"]:
+		fave = True
+	else:
+		fave = False
+	
+	dprint(f"name {name}")
+	
 	return _generate_track(
-		track_num, seed,
+		track_num, name, fave,
 		(int(max_width * 0.8), max_width),
 		(int(max_height * 0.8), max_height),
 		12, 2,
 		10, preview_segment_length)
 
 
-def getCamera():
+def get_camera():
 	camera = {}
 	camera["x"] = 0
 	camera["y"] = 0
@@ -452,7 +543,6 @@ def getCamera():
 
 
 def update(camera, track):
-	global FONT_HEIGHT
 	global TRACK_PREVIEW_W, TRACK_PREVIEW_H
 	
 	translate(camera, track["cx"], track["cy"])
@@ -467,22 +557,26 @@ def update(camera, track):
 	scale(camera, cam_scale)
 
 
-def drawTrackUI(name, track_num):
-	global FONT_WIDTH, FONT_HEIGHT
-	disp.drawText(name,
-		0, SCREEN_H - FONT_HEIGHT,
+def draw_track_ui(name, num, fave):
+	global FONT_W, FONT_H
+	set_font(FONT_W, FONT_H)
+	disp.drawText(
+		name,
+		0, SCREEN_H - FONT_H,
 		1)
-	if track_num > 0:
-		disp.drawText("<",
-			0, (SCREEN_H - FONT_HEIGHT) // 2,
-			1)
-	disp.drawText(">",
-		SCREEN_W - FONT_WIDTH,
-		(SCREEN_H - FONT_HEIGHT) // 2,
+	if num > 0:
+		disp.drawText("<", 0, (SCREEN_H - FONT_H) // 2, 1)
+	disp.drawText(
+		">",
+		SCREEN_W - FONT_W,
+		(SCREEN_H - FONT_H) // 2,
 		1)
+	if fave:
+		disp.drawText("F", 0, 0, 1)
+	
 
 
-def debugDrawScene(camera, track):
+def debug_draw_scene(camera, track):
 	global DEBUG_KEYS
 	# draw box in centre
 	cx, cy = view_transform(camera, track["cx"], track["cy"])
@@ -497,7 +591,7 @@ def debugDrawScene(camera, track):
 			disp.setPixel(x, y, 1)
 
 
-def drawStartLine(x0, y0, x1, y1):
+def draw_start_line(x0, y0, x1, y1):
 	nx, ny = get_normal_in(x0, y0, x1, y1)
 	nx = int(2.5 * nx)
 	ny = int(2.5 * ny)
@@ -520,52 +614,91 @@ def draw(camera, track):
 		
 		if on_screen(x0, y0) or on_screen(x1, y1):
 			if i == 0:
-				drawStartLine(x0, y0, x1, y1)
+				draw_start_line(x0, y0, x1, y1)
 			if DEBUG_MODE and DEBUG_DOTS:
 				disp.setPixel(x0, y0, 1)
 			else:
 				disp.drawLine(x0, y0, x1, y1, 1)
 	if DEBUG_MODE and not DEBUG_DOTS:
-		debugDrawScene(camera, track)
-	drawTrackUI(track["name"], track["num"])
+		debug_draw_scene(camera, track)
+	draw_track_ui(track["name"], track["num"], track["fave"])
 	disp.update()
 
 
-def track_select(seed):
+def track_select(data, from_faves=False):
 	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
-	
-	#init_random()
-	default_font()
+	set_font(5, 7)
 	# Set the FPS (without this call, the default fps is 30)
 	# track selection is targeting low fps:
 	disp.setFPS(15)
-	camera = getCamera()
-	
-	dprint("entering track select loop")
+	camera = get_camera()
+	max_tracks = len(data["fave_names"]) if from_faves else 0
+	dprint(f"max_tracks is {max_tracks}")
 	track_num = 0
-	track = generate_track(track_num, seed)
+	track = generate_track(data, track_num, from_faves)
+	dprint("entering track select loop")
 	while True:
-		if thumbyButton.buttonR.justPressed():
-			track_num += 1
-			track = generate_track(track_num, seed)
+		if (not max_tracks or track_num < max_tracks) \
+		and thumbyButton.buttonR.justPressed():
+			print(f"track_num is {track_num}")
+			if track_num == max_tracks-1:
+				# if we reach the end of max_tracks
+				end_faves_splash()
+			else:
+				track_num += 1
+				track = generate_track(data, track_num, from_faves)
 		if track_num > 0 and thumbyButton.buttonL.justPressed():
 			track_num -= 1
-			track = generate_track(track_num, seed)
+			track = generate_track(data, track_num, from_faves)
 		#hold in loop until a is pressed
 		if thumbyButton.buttonA.justPressed():
-			return track
-		if DEBUG_MODE and thumbyButton.buttonB.justPressed():
-			#flip DEBUG DOTS
-			DEBUG_DOTS = not DEBUG_DOTS
+			# track is chosen
+			break
+		if thumbyButton.buttonB.justPressed():
+			# cancel
+			track = []
+			break
+		if thumbyButton.buttonU.justPressed():
+			toggle_fave(data, track)
 		update(camera, track)
 		draw(camera, track)
+	# save changes to faves
+	save.save()
+	return track
 
 
 def main():
-	splash()
-	data = load_data()
-	track = track_select(data["seed"])
+	while True:
+		splash()
+		data = load_data()
+		track = []
+		while not track:
+			choice = menu(
+				"traks",
+				"faves",
+				"2 player",
+				"tournament",
+				"achievements",
+				"reroll traks"
+			)
+			if choice == 0:
+				track = track_select(data)
+			elif choice == 1:
+				dprint("no of faves: ", len(data["fave_names"]))
+				if len(data["fave_names"]) == 0:
+					no_faves_splash()
+				else:
+					track = track_select(data, from_faves=True)
+			elif choice == 2:
+				raise Exception("not implemented")
+			elif choice == 3:
+				raise Exception("not implemented")
+			elif choice == 4:
+				raise Exception("not implemented")
+			elif choice == 5:
+				raise Exception("not implemented")
+		# race!
 
 
 try:
@@ -576,4 +709,4 @@ except Exception as x:
 	else:
 		with open('/Games/Racer/crashdump.log','w',encoding="utf-8") as f:
 			print_exception(x,f)
-	displayError(x)
+	display_error(x)
