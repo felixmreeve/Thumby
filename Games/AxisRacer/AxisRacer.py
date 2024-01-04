@@ -156,7 +156,7 @@ def menu(*choices, selection=0):
 		disp.fill(0)
 		for i, choice in enumerate(choices):
 			col = 1
-			y = (SCREEN_H)//2 - FONT_H + (i-selection) * (FONT_H+1)
+			y = (SCREEN_H)//2 - FONT_H-1 + (i-selection) * (FONT_H+1)
 			if i == selection:
 				col = 0
 				disp.drawFilledRectangle(0, y-1, SCREEN_W, FONT_H+2, 1)
@@ -495,7 +495,7 @@ def _generate_track(track_num, name_seed, fave, width, height, n_key_points, n_s
 	return track_dict
 
 
-def generate_track(data, track_num, from_faves=False):
+def generate_track(data, track_num, from_faves=None):
 	# wrapper around _generate_track
 	# so that consistent inputs can be set here
 	global TRACK_SCALE
@@ -507,7 +507,7 @@ def generate_track(data, track_num, from_faves=False):
 	
 	dprint("generating_track")
 	if from_faves:
-		name = data["fave_names"][track_num]
+		name = from_faves[track_num]
 	else:
 		track_seed = data["seed"] + track_num
 		dprint(f"with seed {track_seed}")
@@ -516,6 +516,7 @@ def generate_track(data, track_num, from_faves=False):
 		dprint("naming track")
 		name = generate_track_name()
 	
+	# need to check fave status against saved faves
 	if name in data["fave_names"]:
 		fave = True
 	else:
@@ -625,7 +626,7 @@ def draw(camera, track):
 	disp.update()
 
 
-def track_select(data, from_faves=False):
+def track_select(data, use_faves=False):
 	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
 	set_font(5, 7)
@@ -633,7 +634,14 @@ def track_select(data, from_faves=False):
 	# track selection is targeting low fps:
 	disp.setFPS(15)
 	camera = get_camera()
-	max_tracks = len(data["fave_names"]) if from_faves else 0
+	if use_faves:
+		# copy of faves
+		from_faves = data["fave_names"][:]
+		max_tracks = len(from_faves)
+	else:
+		from_faves = None
+		max_tracks = 0
+
 	dprint(f"max_tracks is {max_tracks}")
 	track_num = 0
 	track = generate_track(data, track_num, from_faves)
@@ -663,8 +671,6 @@ def track_select(data, from_faves=False):
 			toggle_fave(data, track)
 		update(camera, track)
 		draw(camera, track)
-	# save changes to faves
-	save.save()
 	return track
 
 
@@ -683,13 +689,13 @@ def main():
 				"reroll traks"
 			)
 			if choice == 0:
-				track = track_select(data)
+				track = track_select(data, use_faves=False)
 			elif choice == 1:
 				dprint("no of faves: ", len(data["fave_names"]))
 				if len(data["fave_names"]) == 0:
 					no_faves_splash()
 				else:
-					track = track_select(data, from_faves=True)
+					track = track_select(data, use_faves=True)
 			elif choice == 2:
 				raise Exception("not implemented")
 			elif choice == 3:
