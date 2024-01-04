@@ -98,7 +98,8 @@ def end_faves_splash():
 	set_font(MINI_FONT_W, MINI_FONT_H)
 	disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
 	disp.drawText("fave tracks", FONT_W*2, SCREEN_H//2, 1)
-	while not thumbyButton.buttonL.justPressed():
+	while not thumbyButton.buttonL.justPressed()\
+	or thumbyButton.buttonB.justPressed():
 		disp.update()
 
 
