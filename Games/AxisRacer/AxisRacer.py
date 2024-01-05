@@ -727,6 +727,6 @@ except Exception as x:
 	if EMULATOR:
 		print_exception(x)
 	else:
-		with open(f'/Games/GAME_NAME/crashdump.log','w',encoding="utf-8") as f:
+		with open(f'/Games/{GAME_NAME}/crashdump.log','w',encoding="utf-8") as f:
 			print_exception(x,f)
 	display_error(x)
