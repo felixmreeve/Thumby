@@ -98,8 +98,8 @@ def end_faves_splash():
 	set_font(MINI_FONT_W, MINI_FONT_H)
 	disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
 	disp.drawText("fave tracks", FONT_W*2, SCREEN_H//2, 1)
-	while not thumbyButton.buttonL.justPressed()\
-	or thumbyButton.buttonB.justPressed():
+	while not (thumbyButton.buttonL.justPressed()\
+		  or thumbyButton.buttonB.justPressed()):
 		disp.update()
 
 
@@ -276,6 +276,15 @@ def set_font(w, h):
 		1)
 
 
+def offset_points(points, offset):
+	print(f"pre offset: {points}")
+	points_out = []
+	points_out += [n for n in points[offset*2:]]
+	points_out += [n for n in points[:offset*2]]
+	print(f"post offset: {points_out}")
+	return points_out
+
+
 def generate_key_points(width, height, n_key_points):
 	track = []
 	# generate key points at regular angles
@@ -294,6 +303,10 @@ def generate_key_points(width, height, n_key_points):
 		y = cy + vy * dist * height/2
 		track.append(x)
 		track.append(y)
+	# offset indices by random amount
+	# to randomise start
+	offset = random.randrange(0, len(track)//2)
+	track = offset_points(track, offset)
 	return track
 
 
