@@ -123,7 +123,7 @@ def keyboard():
 				
 				disp.drawText(letters[y][x], 1 + x*(FONT_W+2), 1 + y*(FONT_H+2), col)
 		disp.drawSprite(enter)
-		disp.drawText(msg, 0, SCREEN_H - FONT_H, 1)
+		disp.drawText(msg+".", 0, SCREEN_H - FONT_H, 1)
 		disp.update()
 	
 	return msg

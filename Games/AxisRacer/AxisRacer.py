@@ -163,6 +163,24 @@ def display_error(msg):
 			thumbyHardware.reset()
 
 
+def player_menu(min_players = 1, max_players = 2):
+	options = []
+	for i in range(min_players, max_players+1):
+		option = str(i) + "player"
+		if i > 1:
+			option += "s"
+		options.append(option)
+	choice = menu(
+		*options,
+		selection = 0,
+		title = "players:"
+	)
+	if choice == -1:
+		return None
+	else:
+		return min_players+choice
+		
+
 def trak_menu(data):
 	choice = 0
 	while True:
@@ -207,6 +225,8 @@ def main():
 				choice = menu(
 					"1 player",
 					"2 player",
+					"hot seat",
+					"time trial",
 					"tournament",
 					"achievements",
 					"reroll traks",
@@ -217,14 +237,19 @@ def main():
 					# back out to splash and reload data
 					break
 				elif choice == 0: # 1 player
-					trak_menu(data)
+					trak = trak_menu(data)
+					raise Exception("1 player not implemented")
 				elif choice == 1: # 2 player
-					raise Exception("not implemented")
-				elif choice == 2: # tournament
-					raise Exception("not implemented")
-				elif choice == 3: # achievements
-					raise Exception("not implemented")
-				elif choice == 4: # reroll traks
+					raise Exception("2 player not implemented")
+				elif choice == 1: # hot seat
+					raise Exception("hot seat not implemented")
+				elif choice == 2: # time trial
+					raise Exception("time trial not implemented")
+				elif choice == 3: # tournament
+					raise Exception("tournament not implemented")
+				elif choice == 4: # achievements
+					raise Exception("achievements not implemented")
+				elif choice == 5: # reroll traks
 					reroll_traks(data)
 					choice = 0
 		else:
