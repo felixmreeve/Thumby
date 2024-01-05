@@ -98,8 +98,8 @@ def end_faves_splash():
 	set_font(MINI_FONT_W, MINI_FONT_H)
 	disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
 	disp.drawText("fave tracks", FONT_W*2, SCREEN_H//2, 1)
-	while not (thumbyButton.buttonL.justPressed()\
-		  or thumbyButton.buttonB.justPressed()):
+	while not (thumbyButton.buttonL.justPressed() \
+			   or thumbyButton.buttonB.justPressed()):
 		disp.update()
 
 
@@ -727,6 +727,6 @@ except Exception as x:
 	if EMULATOR:
 		print_exception(x)
 	else:
-		with open('/Games/Racer/crashdump.log','w',encoding="utf-8") as f:
+		with open(f'/Games/GAME_NAME/crashdump.log','w',encoding="utf-8") as f:
 			print_exception(x,f)
 	display_error(x)
