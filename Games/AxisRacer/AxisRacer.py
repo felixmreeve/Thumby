@@ -1,9 +1,13 @@
 # display is 72x40
 # 0,0 is top left
+# GLOBALS
+global GAME_NAME
+GAME_NAME = "AxisRacer"
+
 import math
 import random
 import time
-from sys import print_exception
+import sys
 
 #import thumby
 import thumbyButton
@@ -11,16 +15,21 @@ from thumbyGraphics import display as disp
 from thumbySaves import saveData as save
 import thumbySprite
 import thumbyHardware
-# GLOBALS
-global GAME_NAME
-GAME_NAME = "AxisRacer"
-
+# import game libs
+if not f"/Games/{GAME_NAME}" in sys.path:
+	sys.path.append(f"/Games/{GAME_NAME}")
+import inpt
+import util
+	
 global FONT_W, FONT_H
 FONT_W = const(5)
 FONT_H = const(7)
 global MINI_FONT_W, MINI_FONT_H
 MINI_FONT_W = const(3)
 MINI_FONT_H = const(5)
+global BIG_FONT_W, BIG_FONT_H
+BIG_FONT_W = const(8)
+BIG_FONT_H = const(8)
 
 global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
@@ -56,8 +65,13 @@ if not EMULATOR :
 	DEBUG_MODE = DEBUG_ON_DEVICE
 
 
-def splash():
+def splash_setup():
 	disp.fill(0)
+	disp.setFPS(30)
+	
+
+def splash():
+	splash_setup()
 	"""
 	# BITMAP: width: 32, height: 32
 	disp.drawSprite(
@@ -68,39 +82,81 @@ def splash():
 			0,0,0,0,0,192,192,224,224,240,240,240,248,248,248,252,252,252,254,254,255,127,127,63,63,31,31,15,15,3,1,0]),
 		0, 0, 0))
 	"""
-	disp.setFont("/lib/font8x8.bin",8,8,1)
+	util.set_font(BIG_FONT_W, BIG_FONT_H)
 	disp.drawText("aXis",38,0,1)
 	disp.drawText("raCer",30,10,1)
-	disp.setFont("/lib/font5x7.bin",5,10,1)
-	disp.drawText('A: start',6,33,1)
+	util.set_font(FONT_W, FONT_H)
+	disp.drawText('A:start',6,33,1)
 	while not thumbyButton.actionJustPressed():
 		disp.update()
 
 
 def no_faves_splash():
-	disp.fill(0)
-	set_font(FONT_W, FONT_H)
+	splash_setup()
+	util.set_font(FONT_W, FONT_H)
 	disp.drawText("no faves!", 0, 0, 1)
-	disp.drawText("B: exit", 0, SCREEN_H-FONT_H, 1)
-	set_font(MINI_FONT_W, MINI_FONT_H)
+	disp.drawText("B:exit", 0, SCREEN_H-FONT_H, 1)
+	util.set_font(MINI_FONT_W, MINI_FONT_H)
 	disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
-	disp.drawText("fave tracks", FONT_W*2, SCREEN_H//2, 1)
+	disp.drawText("fave traks", FONT_W*2, SCREEN_H//2, 1)
 	while not thumbyButton.buttonB.justPressed():
+		if thumbyButton.buttonU.justPressed() \
+		or thumbyButton.buttonA.justPressed():
+			# hacky fix to avoid up having any effect
+			# TODO: write a better justPressed function
+			# to avoid this by checking all buttons
+			pass
 		disp.update()
 
 
 def end_faves_splash():
-	disp.fill(0)
-	set_font(FONT_W, FONT_H)
+	splash_setup()
+	util.set_font(FONT_W, FONT_H)
 	disp.drawText("no more!", 0, 0, 1)
 	disp.drawText("<", 0, (SCREEN_H - FONT_H) // 2, 1)
-	disp.drawText("B: exit", 0, SCREEN_H-FONT_H, 1)
-	set_font(MINI_FONT_W, MINI_FONT_H)
+	disp.drawText("B:exit", 0, SCREEN_H-FONT_H, 1)
+	util.set_font(MINI_FONT_W, MINI_FONT_H)
 	disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
-	disp.drawText("fave tracks", FONT_W*2, SCREEN_H//2, 1)
+	disp.drawText("fave traks", FONT_W*2, SCREEN_H//2, 1)
 	while not (thumbyButton.buttonL.justPressed() \
 			   or thumbyButton.buttonB.justPressed()):
+		if thumbyButton.buttonU.justPressed() \
+		or thumbyButton.buttonA.justPressed():
+			# hacky fix to avoid presses having any effect
+			# TODO: write a better justPressed function
+			# to avoid this by checking all buttons
+			pass
 		disp.update()
+
+
+def reroll_splash():
+	splash_setup()
+	util.set_font(FONT_W, FONT_H)
+	disp.drawText("reroll all", 0, 0, 1)
+	disp.drawText("traks?", 0, FONT_H+1, 1)
+	disp.drawText("B:no A:yes", 0, SCREEN_H-FONT_H, 1)
+	util.set_font(MINI_FONT_W, MINI_FONT_H)
+	disp.drawText("fave traks", 0, (FONT_H+1)*2 + 2, 1)
+	disp.drawText("will be safe", 0, (FONT_H+1)*2 + 2 + MINI_FONT_H+1, 1)
+	while True:
+		if thumbyButton.buttonB.justPressed():
+			return False
+		if thumbyButton.buttonA.justPressed():
+			return True
+		disp.update()
+
+
+def reroll_tracks(data):
+	# get user confirmation
+	if reroll_splash():
+		seed = new_seed()
+		save.setItem("seed", seed)
+		data["seed"] = seed
+		save.save()
+
+
+def new_seed():
+	return time.ticks_cpu()
 
 
 def load_data():
@@ -115,7 +171,7 @@ def load_data():
 		seed = save.getItem("seed")
 	
 	else:
-		seed = time.ticks_cpu()
+		seed = new_seed()
 		dprint(f"generating seed save {seed}")
 		save.setItem("seed", seed)
 		updated = True
@@ -139,9 +195,8 @@ def load_data():
 
 
 def menu(*choices, selection=0):
-	# mini font? or main font?
-	# how many to display / scroll?
-	set_font(FONT_W, FONT_H)
+	disp.setFPS(30)
+	util.set_font(FONT_W, FONT_H)
 	while True:
 		# input
 		if thumbyButton.buttonD.justPressed():
@@ -166,20 +221,33 @@ def menu(*choices, selection=0):
 	return
 
 
+def add_fave(data, track_name):
+	fave_names = data["fave_names"]
+	# put new faves at the front of the list
+	fave_names.insert(0, track_name)
+	save.save()
+
+
+def remove_fave(data, track_name):
+	fave_names = data["fave_names"]
+	fave_names.remove(track_name)
+	save.save()
+
+
 def toggle_fave(data, track):
 	track_name = track["name"]
-	fave_names = data["fave_names"]
-	if track_name in fave_names:
+	if track_name in data["fave_names"]:
 		track["fave"] = False
-		fave_names.remove(track_name)
+		remove_fave(data, track_name)
 	else:
 		track["fave"] = True
-		fave_names.append(track_name)
-	save.save()
+		add_fave(data, track_name)
+		
+
 
 def display_error(msg):
 	disp.setFPS(60)
-	set_font(FONT_W, FONT_H)
+	util.set_font(FONT_W, FONT_H)
 	msg = str(msg)
 	x0 = 0
 	y0 = 32
@@ -269,19 +337,10 @@ def get_normal_in(x0, y0, x1, y1):
 	return normalise(dy, -dx)
 
 
-def set_font(w, h):
-	disp.setFont(
-		f"/lib/font{w}x{h}.bin",
-		w, h,
-		1)
-
-
 def offset_points(points, offset):
-	print(f"pre offset: {points}")
 	points_out = []
 	points_out += [n for n in points[offset*2:]]
 	points_out += [n for n in points[:offset*2]]
-	print(f"post offset: {points_out}")
 	return points_out
 
 
@@ -454,8 +513,9 @@ def _generate_track(track_num, name_seed, fave, width, height, n_key_points, n_s
 	# we can share tracks via the name
 	# add seed together from first/second part
 	# to avoid one word overriding seed
-	name_seed_part1 = int.from_bytes(name_seed.split()[0].encode(), 'big')
-	name_seed_part2 = int.from_bytes(name_seed.split()[1].encode(), 'big')
+	name_parts = name_seed.split()
+	name_seed_part1 = int.from_bytes(name_parts[0].encode(), 'big')
+	name_seed_part2 = int.from_bytes(name_parts[-1].encode(), 'big')
 	name_seed_int = name_seed_part1 + name_seed_part2
 	random.seed(name_seed_int)
 	
@@ -574,7 +634,7 @@ def update(camera, track):
 
 def draw_track_ui(name, num, fave):
 	global FONT_W, FONT_H
-	set_font(FONT_W, FONT_H)
+	util.set_font(FONT_W, FONT_H)
 	disp.drawText(
 		name,
 		0, SCREEN_H - FONT_H,
@@ -643,7 +703,7 @@ def draw(camera, track):
 def track_select(data, use_faves=False):
 	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
-	set_font(5, 7)
+	util.set_font(5, 7)
 	# Set the FPS (without this call, the default fps is 30)
 	# track selection is targeting low fps:
 	disp.setFPS(15)
@@ -662,15 +722,15 @@ def track_select(data, use_faves=False):
 	dprint("entering track select loop")
 	while True:
 		if (not max_tracks or track_num < max_tracks) \
-		and thumbyButton.buttonR.justPressed():
+		and thumbyButton.buttonR.pressed():
 			print(f"track_num is {track_num}")
 			if track_num == max_tracks-1:
 				# if we reach the end of max_tracks
 				end_faves_splash()
 			else:
 				track_num += 1
-				track = generate_track(data, track_num, from_faves)
-		if track_num > 0 and thumbyButton.buttonL.justPressed():
+			track = generate_track(data, track_num, from_faves)
+		if track_num > 0 and thumbyButton.buttonL.pressed():
 			track_num -= 1
 			track = generate_track(data, track_num, from_faves)
 		#hold in loop until a is pressed
@@ -688,45 +748,70 @@ def track_select(data, use_faves=False):
 	return track
 
 
+def track_menu(data):
+	while True:
+		track = []
+		choice = menu(
+			"traks",
+			"faves",
+			"get trak"
+		)
+		if choice == -1:
+			break
+		elif choice == 0:
+			track = track_select(data, use_faves=False)
+		elif choice == 1:
+			dprint("no of faves: ", len(data["fave_names"]))
+			if len(data["fave_names"]) == 0:
+				no_faves_splash()
+			else:
+				track = track_select(data, use_faves=True)
+		elif choice == 2:
+			track_name = inpt.keyboard()
+			if track_name:
+				# if it's already in faves, unfave then refave
+				if track_name in data["fave_names"]:
+					remove_fave(data,track_name)
+				add_fave(data, track_name)
+				track_select(data, use_faves=True)
+		if track:
+			pass
+			# race!
+
+
 def main():
 	while True:
 		splash()
 		data = load_data()
-		track = []
-		while not track:
+		while True:
 			choice = menu(
-				"traks",
-				"faves",
+				"1 player",
 				"2 player",
 				"tournament",
 				"achievements",
 				"reroll traks"
 			)
-			if choice == 0:
-				track = track_select(data, use_faves=False)
-			elif choice == 1:
-				dprint("no of faves: ", len(data["fave_names"]))
-				if len(data["fave_names"]) == 0:
-					no_faves_splash()
-				else:
-					track = track_select(data, use_faves=True)
-			elif choice == 2:
+			if choice == -1:
+				# back out to splash and reload data
+				break
+			elif choice == 0: # 1 player
+				track_menu(data)
+			elif choice == 1: # 2 player
 				raise Exception("not implemented")
-			elif choice == 3:
+			elif choice == 2: # tournament
 				raise Exception("not implemented")
-			elif choice == 4:
+			elif choice == 3: # achievements
 				raise Exception("not implemented")
-			elif choice == 5:
-				raise Exception("not implemented")
-		# race!
+			elif choice == 4: # reroll tracks
+				reroll_tracks(data)
 
-
-try:
-	main()
-except Exception as x:
-	if EMULATOR:
-		print_exception(x)
-	else:
-		with open(f'/Games/{GAME_NAME}/crashdump.log','w',encoding="utf-8") as f:
-			print_exception(x,f)
-	display_error(x)
+if __name__ == "__main__":
+	try:
+		main()
+	except Exception as x:
+		if EMULATOR:
+			sys.print_exception(x)
+		else:
+			with open(f'/Games/{GAME_NAME}/logs/crashdump.log','w',encoding="utf-8") as f:
+				sys.print_exception(x,f)
+		display_error(x)
