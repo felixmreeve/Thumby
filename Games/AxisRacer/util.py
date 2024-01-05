@@ -15,8 +15,20 @@ SCREEN_W = const(72)
 SCREEN_H = const(40)
 
 
+# ********** master debug flag **********
+global DEBUG_MODE
+DEBUG_MODE = False
+# ***************************************
+
+
 def set_font(w, h):
 	disp.setFont(
 		f"/lib/font{w}x{h}.bin",
 		w, h,
 		1)
+
+
+def dprint(*args, **kwargs):
+	global DEBUG_MODE
+	if DEBUG_MODE:
+		print(*args, **kwargs)
