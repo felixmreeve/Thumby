@@ -14,6 +14,7 @@ from thumbyGraphics import display as disp
 from thumbySaves import saveData as save
 import thumbySprite
 import thumbyHardware
+from thumbyLink import link
 # import game libs
 if not f"/Games/{GAME_NAME}" in sys.path:
 	sys.path.append(f"/Games/{GAME_NAME}")
@@ -138,7 +139,6 @@ def menu(*choices, selection=0, title=""):
 	return
 
 
-
 def display_error(msg):
 	disp.setFPS(60)
 	util.set_font(FONT_W, FONT_H)
@@ -162,31 +162,61 @@ def display_error(msg):
 		or thumbyButton.buttonB.justPressed():
 			thumbyHardware.reset()
 
-
-def player_menu(min_players = 1, max_players = 2):
+# currently not used
+def player_count_menu(min_players = 2, max_players = 8, title = "players:"):
 	options = []
 	for i in range(min_players, max_players+1):
-		option = str(i) + "player"
-		if i > 1:
-			option += "s"
+		option = str(i) + " player"
 		options.append(option)
 	choice = menu(
 		*options,
 		selection = 0,
-		title = "players:"
+		title = title
 	)
 	if choice == -1:
 		return None
 	else:
 		return min_players+choice
-		
+
+# default option of [] means it will remember the list for later
+def named_players_menu(player_names = [], min_players = 2, title = "players:"):
+	choice = 0
+	if len(player_names) >= min_players:
+		choice = len(player_names)+1 # race!
+	while True:
+		if len(player_names) < min_players:
+			options = ["+"]
+		else:
+			options = ["+", "race!"]
+		choice = menu(
+			*player_names,
+			*options,
+			selection = choice,
+			title = title
+		)
+		if choice == -1:
+			return None
+		elif choice < len(player_names): # edit/remove a name
+			player_name = inpt.keyboard(player_names[choice])
+			if not player_name:
+				player_names.pop(choice)
+			else:
+				player_names[choice] = player_name
+		elif choice == len(player_names): # plus
+			player_name = inpt.keyboard()
+			if player_name:
+				player_names.append(player_name)
+			choice = len(player_names)
+		elif choice == len(player_names)+1: # race!
+			return player_names
+
 
 def trak_menu(data):
 	choice = 0
 	while True:
 		trak = None
 		choice = menu(
-			"all traks",
+			"trak list",
 			"faves",
 			"get trak",
 			selection = choice,
@@ -212,50 +242,109 @@ def trak_menu(data):
 				choice = 1
 				traklib.trak_select(data, use_faves=True)
 		if trak:
-			pass
-			# race!
+			break
+	return trak
+
+
+def one_player(data):
+	trak = trak_menu(data)
+	if trak:
+		race(trak, multiplayer = False)
+
+
+def two_player(data):
+	# TODO: add link cable check
+	if link_cable_response():
+		trak = trak_menu(data)
+		if trak:
+			race(trak, multiplayer = True)
+	else:
+		splash.no_cable_response()
+
+
+def hot_seat(data):
+	# choose players
+	player_names = named_players_menu(title="hotseat:")
+	if player_names:
+		trak = trak_menu(data)
+		if trak:
+			time_trial_race(trak, player_names)
+
+
+def time_trial(data):
+	trak = trak_menu(data)
+	if trak:
+		time_trial_race(trak)
+
+
+def tournament(data):
+	player_names = named_players_menu()
+	raise Exception("tournament not implemented")
+
+
+def join_game(data):
+	raise Exception("join game not implemented")
+
+			
+def achievements(data):
+	raise Exception("achievements not implemented")
+
+
+def share_times(data):
+	raise Exception("share times not implemented")
+
+
+def main_menu():
+	data = load_data()
+	choice = 0
+	while True:
+		choice = menu(
+			"1 player",
+			"2 player",
+			"hot seat",
+			"time trial",
+			"tournament",
+			"join game",
+			"achievements",
+			"share times",
+			"reroll traks",
+			selection = choice,
+			title = "menu:"
+		)
+		if choice == -1:
+			break # back out to splash and reload data
+		elif choice == 0: # 1 player
+			one_player(data)
+		elif choice == 1: # 2 player
+			two_player(data)
+		elif choice == 2: # hot seat
+			hot_seat(data)
+		elif choice == 3: # time trial
+			time_trial(data)
+		elif choice == 4: # tournament
+			tournament(data)
+		elif choice == 5: # join game
+			join_game(data)
+		elif choice == 6: # achievements
+			achievements(data)            
+		elif choice == 7: # share times
+			share_times(data)
+		elif choice == 8: # reroll traks
+			reroll_traks(data)
+			choice = 0 # reset choice to 1 player so they can see new traks
 
 
 def main():
 	while True:
-		if splash.main_splash():
-			data = load_data()
-			choice = 0
-			while True:
-				choice = menu(
-					"1 player",
-					"2 player",
-					"hot seat",
-					"time trial",
-					"tournament",
-					"achievements",
-					"reroll traks",
-					selection = choice,
-					title = "menu:"
-				)
-				if choice == -1:
-					# back out to splash and reload data
-					break
-				elif choice == 0: # 1 player
-					trak = trak_menu(data)
-					raise Exception("1 player not implemented")
-				elif choice == 1: # 2 player
-					raise Exception("2 player not implemented")
-				elif choice == 1: # hot seat
-					raise Exception("hot seat not implemented")
-				elif choice == 2: # time trial
-					raise Exception("time trial not implemented")
-				elif choice == 3: # tournament
-					raise Exception("tournament not implemented")
-				elif choice == 4: # achievements
-					raise Exception("achievements not implemented")
-				elif choice == 5: # reroll traks
-					reroll_traks(data)
-					choice = 0
+		start = splash.main_splash()
+		if start:
+			main_menu()
 		else:
 			# quit
 			disp.fill(0)
-			break
+			disp.update()
+			thumbyHardware.reset()
+
 
 try:
 	main()

@@ -63,11 +63,11 @@ def tapDir():
 	return x, y
 
 # keyboard input
-def keyboard():
+def keyboard(edit_msg = ""):
 	global FONT_W, FONT_H
 	disp.setFPS(30)
 	util.set_font(FONT_W, FONT_H)
-	msg = ""
+	msg = edit_msg
 	letters = [
 		"QWERTYUIOP",
 		"ASDFGHJKL ",
