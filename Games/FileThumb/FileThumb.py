@@ -115,10 +115,29 @@ def action_menu(path, entry):
 		"paste",
 		"rename",
 		"delete",
+		"exit",
+		title = entry
 	)
 	if btn == "B":
 		return
 	# button must have been A:
+	if choice == 0: # transfer
+		pass
+	elif choice == 1: # receive
+		pass
+	elif choice == 2: # copy
+		pass
+	elif choice == 3: # paste
+		pass
+	elif choice == 4: # rename
+		pass
+	elif choice == 5: # delete
+		if confirm(f"remove {entry}"):
+			pass
+	elif choice == 6: # exit
+		if confirm("exit?"):
+			hard.reset()
+
 	
 
 
