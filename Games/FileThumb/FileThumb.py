@@ -12,6 +12,7 @@ file_type = 0x8000
 
 
 def display_error(msg):
+	disp.setFont("/lib/font5x7.bin", 5, 7, 1)
 	msg = str(msg)
 	x0 = 0
 	y0 = 32
@@ -31,6 +32,11 @@ def display_error(msg):
 		if butt.buttonA.justPressed() \
 		or butt.buttonB.justPressed():
 			hard.reset()
+
+
+def confirm(msg):
+	# return True or False
+	pass
 
 
 def list_entries(path):
@@ -116,7 +122,7 @@ def action_menu(path, entry):
 		"rename",
 		"delete",
 		"exit",
-		title = entry
+		title = entry[0]
 	)
 	if btn == "B":
 		return
