@@ -117,7 +117,7 @@ def menu(*choices, selection=0, title=""):
 			selection += 1
 		if thumbyButton.buttonU.justPressed():
 			selection -= 1
-		if thumbyBbuttonA.justPressed():
+		if thumbyButton.buttonA.justPressed():
 			return selection # int
 		if thumbyButton.buttonB.justPressed():
 			return -1 # back out
