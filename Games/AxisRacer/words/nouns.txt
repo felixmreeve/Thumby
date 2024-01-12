@@ -32,6 +32,7 @@ circt
 clifs
 clock
 cloud
+coast
 cove
 cratr
 cruse
@@ -134,6 +135,7 @@ road
 ruins
 rush
 sands
+sewer
 shaft
 shine
 ship

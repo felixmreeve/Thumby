@@ -117,7 +117,7 @@ def menu(*choices, selection=0, title=""):
 			selection += 1
 		if thumbyButton.buttonU.justPressed():
 			selection -= 1
-		if thumbyButton.buttonA.justPressed():
+		if thumbyBbuttonA.justPressed():
 			return selection # int
 		if thumbyButton.buttonB.justPressed():
 			return -1 # back out
@@ -136,7 +136,6 @@ def menu(*choices, selection=0, title=""):
 				disp.drawFilledRectangle(0, y-1, SCREEN_W, FONT_H+2, 1)
 			disp.drawText(choice, 1, y, col)
 		disp.update()
-	return
 
 
 def display_error(msg):

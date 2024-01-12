@@ -19,6 +19,7 @@ brown
 bumpy
 busy
 cake
+chaos
 chery
 chikn
 chili
@@ -86,6 +87,7 @@ irish
 koala
 joe's
 jolly
+jungl
 lamp
 light
 liqid
@@ -155,6 +157,7 @@ swift
 tasty
 teal
 tekno
+thumb
 tight
 toon
 twili
