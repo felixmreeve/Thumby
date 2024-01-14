@@ -302,7 +302,10 @@ def generate_quadratic_bezier_points(segment_trak, key_step, n_curve_segments):
 		trak.append(y2)
 	return trak
 
-
+# TODO: rewrite to be:
+# - more memory efficient > pre allocate trak list as [0.0] * length*2
+# make sure there's no duplicate point at the start/end
+# write to be based on number of segments, not segment length? for consistency
 def resample_trak(in_trak, segment_dist, cleanup = False):
 	# first calculate all current segment distances
 	total_distance = 0
@@ -315,6 +318,7 @@ def resample_trak(in_trak, segment_dist, cleanup = False):
 	n_segments = round(total_distance/segment_dist)
 	fdist = total_distance/n_segments
 	trak = []
+	new_i = 0
 	current_dist = 0
 	x0, y0 = in_trak[0], in_trak[1]
 	for i0 in range(0, len(in_trak), 2):
@@ -334,6 +338,8 @@ def resample_trak(in_trak, segment_dist, cleanup = False):
 			in_trak[i1+1] = None
 		current_dist -= seg_dist
 		x0, y0 = x1, y1
+	util.dprint("first point:", trak[0], trak[1])
+	util.dprint("last point:", trak[-2], trak[-1])
 	return trak, fdist
 
 
@@ -491,7 +497,7 @@ def generate_trak(data, old_trak, trak_num, from_faves):
 		(int(max_width * 0.8), max_width),
 		(int(max_height * 0.8), max_height),
 		12, 2,
-		4, preview_segment_length)
+		5, preview_segment_length)
 
 
 def update_camera_preview(camera, trak):
