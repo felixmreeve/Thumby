@@ -245,43 +245,49 @@ def trak_menu(data):
 
 
 def one_player(data):
-	trak = trak_menu(data)
-	if trak:
-		traklib.race(trak, multiplayer = False)
-
-
-def two_player(data):
-	# TODO: add link cable check
-	if link_cable_response():
+	while True:
 		trak = trak_menu(data)
 		if trak:
-			traklib.race(trak, multiplayer = True)
-	else:
-		splash.no_cable_response()
+			traklib.race(trak, multiplayer = False)
+		else:
+			break
+
+def two_player(data):
+	while True:
+		# TODO: add link cable check
+		if link_cable_response():
+			trak = trak_menu(data)
+			if trak:
+				traklib.race(trak, multiplayer = True)
+			else:
+				break
+		else:
+			splash.no_cable_response()
 
 
 def hot_seat(data):
 	# choose players
 	player_names = named_players_menu(title="hotseat:")
 	if player_names:
-		trak = trak_menu(data)
-		if trak:
-			time_trial_race(trak, player_names)
+		while True:
+			trak = trak_menu(data)
+			if trak:
+				time_trial_race(trak, player_names)
+			else:
+				break
 
 
 def time_trial(data):
-	trak = trak_menu(data)
-	if trak:
-		time_trial_race(trak)
-
+	while True:
+		trak = trak_menu(data)
+		if trak:
+			time_trial_race(trak)
+		else:
+			break
 
 def tournament(data):
 	player_names = named_players_menu()
 	raise Exception("tournament not implemented")
-
-
-def join_game(data):
-	raise Exception("join game not implemented")
 
 			
 def achievements(data):
@@ -290,6 +296,10 @@ def achievements(data):
 
 def share_times(data):
 	raise Exception("share times not implemented")
+
+
+def demo_mode(data):
+	raise Exception("demo mode not implemented")
 
 
 def main_menu():
@@ -302,9 +312,9 @@ def main_menu():
 			"hot seat",
 			"time trial",
 			"tournament",
-			"join game",
 			"achievements",
 			"share times",
+			"demo mode"
 			"reroll traks",
 			selection = choice,
 			title = "menu:"
@@ -321,12 +331,12 @@ def main_menu():
 			time_trial(data)
 		elif choice == 4: # tournament
 			tournament(data)
-		elif choice == 5: # join game
-			join_game(data)
-		elif choice == 6: # achievements
-			achievements(data)            
-		elif choice == 7: # share times
+		elif choice == 5: # achievements
+			achievements(data)
+		elif choice == 6: # share times
 			share_times(data)
+		elif choice == 7: # demo mode
+			demo_mode(data)
 		elif choice == 8: # reroll traks
 			reroll_traks(data)
 			choice = 0 # reset choice to 1 player so they can see new traks

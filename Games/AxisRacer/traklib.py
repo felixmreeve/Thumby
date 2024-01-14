@@ -118,6 +118,12 @@ def get_normal_in(x0, y0, x1, y1):
 	return normalise(dy, -dx)
 
 
+def get_dist(x0, y0, x1, y1):
+	vx = x1-x0
+	vy = y1-y0
+	return math.sqrt(vx*vx + vy*vy)
+
+
 def get_camera():
 	camera = {
 		"x": 0,
@@ -133,6 +139,8 @@ def get_camera():
 def get_racer():
 	racer = {
 		"seg": 0, # segment on track
+		"x": 0,
+		"y": 0,
 		"t": 0, # t interpolation value along segment
 		"r": 0, # rotation
 		"s": 1 # scale
@@ -140,9 +148,9 @@ def get_racer():
 	return racer
 
 
-def get_racer_pos(racer, points):
+def update_racer_pos(racer, points):
 	segment = racer["seg"]*2 # double since points are x, y
-	return points[segment], points[segment+1]
+	racer["x"], racer["y"] = points[segment], points[segment+1]
 
 def next_idx(i, trak):
 	return (i+2) % len(trak)
@@ -270,26 +278,24 @@ def generate_quadratic_bezier_points(segment_trak, key_step, n_curve_segments):
 	return trak
 
 
-def resample_trak(in_trak, segment_dist):
+def resample_trak(in_trak, segment_dist, cleanup = False):
 	# first calculate all current segment distances
+	total_distance = 0
 	distances = []
 	for i0 in range(0, len(in_trak), 2):
 		i1 = next_idx(i0, in_trak)
 		x0, y0 = in_trak[i0], in_trak[i0+1]
 		x1, y1 = in_trak[i1], in_trak[i1+1]
-		vx = x1-x0
-		vy = y1-y0
-		distance = math.sqrt(vx*vx + vy*vy)
-		distances.append(distance)
-	total_distance = sum(distances)
+		total_distance += get_dist(x0, y0, x1, y1)
 	n_segments = round(total_distance/segment_dist)
 	fdist = total_distance/n_segments
 	trak = []
 	current_dist = 0
 	x0, y0 = in_trak[0], in_trak[1]
-	for i, seg_dist in enumerate(distances):
-		i1 = next_idx(i*2, in_trak) # i*2 to get in_trak x value idx
+	for i0 in range(0, len(in_trak), 2):
+		i1 = next_idx(i0, in_trak)
 		x1, y1 = in_trak[i1], in_trak[i1+1]
+		seg_dist = get_dist(x0, y0, x1, y1)
 		while current_dist < seg_dist:
 			t = current_dist/seg_dist
 			x = (1-t)*x0 + t*x1
@@ -297,6 +303,10 @@ def resample_trak(in_trak, segment_dist):
 			trak.append(x)
 			trak.append(y)
 			current_dist += fdist
+		if cleanup:
+			# clean up in_trak to reduce memory
+			in_trak[i1] = None
+			in_trak[i1+1] = None
 		current_dist -= seg_dist
 		x0, y0 = x1, y1
 	return trak, fdist
@@ -389,9 +399,9 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
 	# points, not all points
 	trak = generate_quadratic_bezier_points(
 		trak, n_segment_points, 12)
-		
+
 	util.dprint("resampling")
-	trak, seg_dist = resample_trak(trak, resample_segment_length)
+	trak, seg_dist = resample_trak(trak, resample_segment_length, cleanup = True)
 	
 	util.dprint("generating preview")
 	preview_points, preview_seg_dist = resample_trak(trak, preview_segment_length)
@@ -419,10 +429,13 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
 	return trak_dict
 
 
-def generate_trak(data, trak_num, from_faves=None):
+def generate_trak(data, old_trak, trak_num, from_faves):
 	# wrapper around _generate_trak
 	# so that consistent inputs can be set here
 	global TRAK_SCALE
+	# clean up old trak for memory reasons first!
+	if old_trak:
+		old_trak.clear()
 	# preview_segment_length will be roughly X pixels onscreen
 	# if set to X * TRAK_SCALE
 	preview_segment_length = 2 * TRAK_SCALE
@@ -453,7 +466,7 @@ def generate_trak(data, trak_num, from_faves=None):
 		(int(max_width * 0.8), max_width),
 		(int(max_height * 0.8), max_height),
 		12, 2,
-		8, preview_segment_length)
+		4, preview_segment_length)
 
 
 def update_camera_preview(camera, trak):
@@ -503,7 +516,7 @@ def trak_select(data, use_faves=False):
 
 	util.dprint(f"max_traks is {max_traks}")
 	trak_num = 0
-	trak = generate_trak(data, trak_num, from_faves)
+	trak = generate_trak(data, None, trak_num, from_faves)
 	util.dprint("entering trak select loop")
 	while True:
 		if (not max_traks or trak_num < max_traks) \
@@ -513,10 +526,12 @@ def trak_select(data, use_faves=False):
 				splash.end_faves_splash()
 			else:
 				trak_num += 1
-			trak = generate_trak(data, trak_num, from_faves)
+			#trak = []
+			trak = generate_trak(data, trak, trak_num, from_faves)
 		if trak_num > 0 and thumbyButton.buttonL.pressed():
 			trak_num -= 1
-			trak = generate_trak(data, trak_num, from_faves)
+			#trak = []
+			trak = generate_trak(data, trak, trak_num, from_faves)
 		#hold in loop until a is pressed
 		if thumbyButton.buttonA.justPressed():
 			# trak is chosen
@@ -532,25 +547,43 @@ def trak_select(data, use_faves=False):
 	return trak
 
 
-def update_race(camera, racer, trak):
+def update_racer(racer, trak):
 	points = trak["trak"]
-	racer_x, racer_y = get_racer_pos(racer, points)
-	translate(camera, racer_x, racer_y)
 	racer["seg"] += 1
-	racer["seg"] %= len(points)//2
+	racer["seg"] %= len(trak["trak"])//2
+	update_racer_pos(racer, points)
 
 
-def draw_race(camera, trak):
+def update_camera(camera, racer):
+	translate(camera, racer["x"], racer["y"])
+
+
+def update_race(camera, racer, trak):
+	update_racer(racer, trak)
+	update_camera(camera, racer)
+
+
+def draw_race(camera, racer, blocker, trak):
 	disp.fill(0)
 	draw_trak(camera, trak)
+	blocker.x, blocker.y = view_transform(
+		camera, racer["x"]-3.5, racer["y"]-3.5)
+	disp.drawSprite(blocker)
 	disp.update()
 
 
 def race(trak, multiplayer = False):
+	disp.setFPS(60)
 	racer = get_racer()
 	start_point = trak["trak"][:2]
 	#racers = [get_racer() for i in range(2)]
 	camera = get_camera()
+	blocker = sprite.Sprite(
+		7, 7,
+		bytearray([99,65,0,0,0,65,99]),
+		0, 0,
+		1
+	)
 	# start in trak preview position
 	#update_camera_preview(camera, trak))
 	while True:
@@ -558,5 +591,5 @@ def race(trak, multiplayer = False):
 		if thumbyButton.buttonB.justPressed():
 			break
 		update_race(camera, racer, trak)
-		draw_race(camera, trak)
+		draw_race(camera, racer, blocker, trak)
 	
