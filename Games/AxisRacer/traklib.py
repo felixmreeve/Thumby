@@ -136,21 +136,36 @@ def get_camera():
 	return camera
 
 
-def get_racer():
+def get_racer(sprite):
 	racer = {
 		"seg": 0, # segment on track
-		"x": 0,
-		"y": 0,
 		"t": 0, # t interpolation value along segment
 		"r": 0, # rotation
-		"s": 1 # scale
+		"x": 0,
+		"y": 0,
+		"sprite": sprite
 	}
 	return racer
 
 
 def update_racer_pos(racer, points):
-	segment = racer["seg"]*2 # double since points are x, y
-	racer["x"], racer["y"] = points[segment], points[segment+1]
+	i = racer["seg"]*2 # double since points are x, y
+	racer["x"], racer["y"] = points[i], points[i+1]
+
+
+def update_racer_rot(racer, points):
+	i0 = racer["seg"]*2  # double since points are x, y
+	i1 = next_idx(i0, points)
+	x0, y0 = points[i0], points[i0+1]
+	x1, y1 = points[i1], points[i1+1]
+	vx = x1-x0
+	vy = y1-y0 # negative so that 0 is up
+	#vx, vy = normalise(vx, vy)
+	# add pi/2 so up = 0 and % to change range 0<a<2pi
+	angle = (math.atan2(vy, vx) + (math.pi/2)) % (2*math.pi)
+	racer["r"] = angle
+	racer["sprite"].setFrame( int(angle / (2*math.pi)*8 + 0.5) % 8)
+
 
 def next_idx(i, trak):
 	return (i+2) % len(trak)
@@ -194,6 +209,16 @@ def draw_trak(camera, trak, preview = False):
 				draw_start_line(x0, y0, x1, y1)
 			disp.drawLine(x0, y0, x1, y1, 1)
 
+
+def draw_racer(camera, racer, blocker):
+	racer["sprite"].x, racer["sprite"].y = view_transform(
+		camera, racer["x"], racer["y"])
+	racer["sprite"].x -= 3.5
+	racer["sprite"].y -= 3.5
+	if blocker:
+		blocker.x, blocker.y = racer["sprite"].x, racer["sprite"].y
+		disp.drawSprite(blocker)
+	disp.drawSprite(racer["sprite"])
 
 def offset_points(points, offset):
 	points_out = []
@@ -552,6 +577,7 @@ def update_racer(racer, trak):
 	racer["seg"] += 1
 	racer["seg"] %= len(trak["trak"])//2
 	update_racer_pos(racer, points)
+	update_racer_rot(racer, points)
 
 
 def update_camera(camera, racer):
@@ -566,15 +592,21 @@ def update_race(camera, racer, trak):
 def draw_race(camera, racer, blocker, trak):
 	disp.fill(0)
 	draw_trak(camera, trak)
-	blocker.x, blocker.y = view_transform(
-		camera, racer["x"]-3.5, racer["y"]-3.5)
-	disp.drawSprite(blocker)
+	
+	draw_racer(camera, racer, blocker)
 	disp.update()
 
 
 def race(trak, multiplayer = False):
 	disp.setFPS(60)
-	racer = get_racer()
+	racer_sprite = sprite.Sprite(
+		7, 7,
+		# BITMAP: width: 56, height: 7
+		bytearray([0,54,74,65,74,54,0,24,36,68,67,49,10,13,28,34,34,20,34,54,8,12,18,17,97,70,40,88,0,54,41,65,41,54,0,88,40,70,97,17,18,12,8,54,34,20,34,34,28,13,10,49,67,68,36,24]),
+		0, 0,
+		0
+	)
+	racer = get_racer(racer_sprite)
 	start_point = trak["trak"][:2]
 	#racers = [get_racer() for i in range(2)]
 	camera = get_camera()
