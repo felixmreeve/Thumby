@@ -537,7 +537,7 @@ def update_race(camera, racer, trak):
 	racer_x, racer_y = get_racer_pos(racer, points)
 	translate(camera, racer_x, racer_y)
 	racer["seg"] += 1
-	racer["seg"] %= len(points)
+	racer["seg"] %= len(points)/2
 
 
 def draw_race(camera, trak):
