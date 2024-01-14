@@ -554,6 +554,9 @@ def race(trak, multiplayer = False):
 	# start in trak preview position
 	#update_camera_preview(camera, trak))
 	while True:
+		#input()
+		if thumbyButton.buttonB.justPressed():
+			break
 		update_race(camera, racer, trak)
 		draw_race(camera, trak)
 	
