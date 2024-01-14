@@ -453,7 +453,7 @@ def generate_trak(data, trak_num, from_faves=None):
 		(int(max_width * 0.8), max_width),
 		(int(max_height * 0.8), max_height),
 		12, 2,
-		4, preview_segment_length)
+		8, preview_segment_length)
 
 
 def update_camera_preview(camera, trak):
@@ -537,7 +537,7 @@ def update_race(camera, racer, trak):
 	racer_x, racer_y = get_racer_pos(racer, points)
 	translate(camera, racer_x, racer_y)
 	racer["seg"] += 1
-	racer["seg"] %= len(points)/2
+	racer["seg"] %= len(points)//2
 
 
 def draw_race(camera, trak):
