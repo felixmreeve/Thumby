@@ -4,6 +4,7 @@ import random
 import thumbyButton
 from thumbyGraphics import display as disp
 from thumbySaves import saveData as save
+import thumbySprite as sprite
 
 global GAME_NAME
 GAME_NAME = "AxisRacer"
@@ -32,7 +33,13 @@ global TRAK_PREVIEW_W, TRAK_PREVIEW_H
 TRAK_PREVIEW_W = const(SCREEN_W - (FONT_W+1)*2)
 TRAK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
 
-
+bb = bytearray([14,17,33,66,33,17,14]),
+fave_heart = sprite.Sprite(
+	7, 7,
+	bytearray([14,17,33,66,33,17,14,14,31,63,126,63,31,14]),
+	1, 1,
+	0
+)
 
 def add_fave(data, trak_name):
 	fave_names = data["fave_names"]
@@ -112,15 +119,30 @@ def get_normal_in(x0, y0, x1, y1):
 
 
 def get_camera():
-	camera = {}
-	camera["x"] = 0
-	camera["y"] = 0
-	camera["r"] = 0 # rotation
-	camera["s"] = 1 # scale
-	camera["filmwidth"] = 72
-	camera["filmheight"] = 40
+	camera = {
+		"x": 0,
+		"y": 0,
+		"r": 0, # rotation
+		"s": 1, # scale
+		"filmwidth": 72,
+		"filmheight": 40
+	}
 	return camera
 
+
+def get_racer():
+	racer = {
+		"seg": 0, # segment on track
+		"t": 0, # t interpolation value along segment
+		"r": 0, # rotation
+		"s": 1 # scale
+	}
+	return racer
+
+
+def get_racer_pos(racer, points):
+	segment = racer["seg"]*2 # double since points are x, y
+	return points[segment], points[segment+1]
 
 def next_idx(i, trak):
 	return (i+2) % len(trak)
@@ -144,17 +166,16 @@ def draw_trak_ui(name, num, fave):
 		SCREEN_W - FONT_W,
 		(SCREEN_H - FONT_H) // 2,
 		1)
-	if fave:
-		disp.drawText("F", 0, 0, 1)
+	fave_heart.setFrame(int(fave))
+	disp.drawSprite(fave_heart)
 
 
-def draw_trak_select(camera, trak):
-	global DEBUG_MODE, DEBUG_DOTS
+def draw_trak(camera, trak, preview = False):
 	global FONT_WIDTH, FONT_HEIGHT
-	disp.fill(0) # Fill canvas to black
-	points = trak["preview"]
-	key_points = trak["keys"]
-	
+	if preview:
+		points = trak["preview"]
+	else:
+		points = trak["trak"]
 	for i in range(0, len(points), 2):
 		x0, y0 = view_transform(camera, points[i], points[i+1])
 		i1 = next_idx(i, points)
@@ -163,10 +184,7 @@ def draw_trak_select(camera, trak):
 		if on_screen(x0, y0) or on_screen(x1, y1):
 			if i == 0:
 				draw_start_line(x0, y0, x1, y1)
-			
 			disp.drawLine(x0, y0, x1, y1, 1)
-	draw_trak_ui(trak["name"], trak["num"], trak["fave"])
-	disp.update()
 
 
 def offset_points(points, offset):
@@ -435,13 +453,11 @@ def generate_trak(data, trak_num, from_faves=None):
 		(int(max_width * 0.8), max_width),
 		(int(max_height * 0.8), max_height),
 		12, 2,
-		10, preview_segment_length)
+		4, preview_segment_length)
 
 
-
-def update_trak_select(camera, trak):
+def update_camera_preview(camera, trak):
 	global TRAK_PREVIEW_W, TRAK_PREVIEW_H
-	
 	translate(camera, trak["cx"], trak["cy"])
 	width_scale = trak["bw"] / TRAK_PREVIEW_W
 	height_scale = trak["bh"] / TRAK_PREVIEW_H
@@ -454,21 +470,6 @@ def update_trak_select(camera, trak):
 	scale(camera, cam_scale)
 
 
-def debug_draw_trak_select(camera, trak):
-	global DEBUG_KEYS
-	# draw box in centre
-	cx, cy = view_transform(camera, trak["cx"], trak["cy"])
-	disp.drawRectangle(cx-1, cy-1, 3, 3, 1)
-	if DEBUG_KEYS:
-		# draw key points
-		key_points = trak["keys"]
-		x0, y0 = view_transform(camera, key_points[0], key_points[1])
-		disp.drawRectangle(x0-1, y0-1, 3, 3, 1)
-		for i in range(2, len(key_points), 2):
-			x, y = view_transform(camera, key_points[i], key_points[i+1])
-			disp.setPixel(x, y, 1)
-
-
 def draw_start_line(x0, y0, x1, y1):
 	nx, ny = get_normal_in(x0, y0, x1, y1)
 	nx = int(2.5 * nx)
@@ -478,8 +479,14 @@ def draw_start_line(x0, y0, x1, y1):
 	disp.setPixel(x0+nx, y0+ny, 1)
 
 
+def draw_trak_select(camera, trak):
+	disp.fill(0) # Fill canvas to black
+	draw_trak(camera, trak, preview = True)
+	draw_trak_ui(trak["name"], trak["num"], trak["fave"])
+	disp.update()
+
+
 def trak_select(data, use_faves=False):
-	global DEBUG_DOTS
 	global FONT_WIDTH, FONT_HEIGHT
 	util.set_font(5, 7)
 	# Set the FPS (without this call, the default fps is 30)
@@ -520,6 +527,33 @@ def trak_select(data, use_faves=False):
 			break
 		if thumbyButton.buttonU.justPressed():
 			toggle_fave(data, trak)
-		update_trak_select(camera, trak)
+		update_camera_preview(camera, trak)
 		draw_trak_select(camera, trak)
 	return trak
+
+
+def update_race(camera, racer, trak):
+	points = trak["trak"]
+	racer_x, racer_y = get_racer_pos(racer, points)
+	translate(camera, racer_x, racer_y)
+	racer["seg"] += 1
+	racer["seg"] %= len(points)
+
+
+def draw_race(camera, trak):
+	disp.fill(0)
+	draw_trak(camera, trak)
+	disp.update()
+
+
+def race(trak, multiplayer = False):
+	racer = get_racer()
+	start_point = trak["trak"][:2]
+	#racers = [get_racer() for i in range(2)]
+	camera = get_camera()
+	# start in trak preview position
+	#update_camera_preview(camera, trak))
+	while True:
+		update_race(camera, racer, trak)
+		draw_race(camera, trak)
+	

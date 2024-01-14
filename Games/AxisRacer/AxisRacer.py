@@ -12,8 +12,7 @@ import sys
 import thumbyButton
 from thumbyGraphics import display as disp
 from thumbySaves import saveData as save
-import thumbySprite
-import thumbyHardware
+import thumbyHardware as hard
 from thumbyLink import link
 # import game libs
 if not f"/Games/{GAME_NAME}" in sys.path:
@@ -51,12 +50,12 @@ else:
 
 # ********** master debug flag **********
 global DEBUG_MODE
-DEBUG_MODE = False
+DEBUG_MODE = True
 # ***************************************
 # extra debug flags
-global DEBUG_ON_DEVICE, DEBUG_DOTS, DEBUG_FIXED_SEED, DEBUG_KEYS
+global DEBUG_ON_DEVICE, DEBUG_FIXED_SEED
 DEBUG_ON_DEVICE = False
-DEBUG_FIXED_SEED = False
+DEBUG_FIXED_SEED = True
 if not EMULATOR:
 	DEBUG_MODE = DEBUG_ON_DEVICE
 
@@ -159,7 +158,7 @@ def display_error(msg):
 		pos %= msg_len
 		if thumbyButton.buttonA.justPressed() \
 		or thumbyButton.buttonB.justPressed():
-			thumbyHardware.reset()
+			hard.reset()
 
 # currently not used
 def player_count_menu(min_players = 2, max_players = 8, title = "players:"):
@@ -248,7 +247,7 @@ def trak_menu(data):
 def one_player(data):
 	trak = trak_menu(data)
 	if trak:
-		race(trak, multiplayer = False)
+		traklib.race(trak, multiplayer = False)
 
 
 def two_player(data):
@@ -256,7 +255,7 @@ def two_player(data):
 	if link_cable_response():
 		trak = trak_menu(data)
 		if trak:
-			race(trak, multiplayer = True)
+			traklib.race(trak, multiplayer = True)
 	else:
 		splash.no_cable_response()
 
@@ -342,7 +341,7 @@ def main():
 			# quit
 			disp.fill(0)
 			disp.update()
-			thumbyHardware.reset()
+			hard.reset()
 
 
 try:
