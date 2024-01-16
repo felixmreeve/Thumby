@@ -13,7 +13,7 @@ import util
 import splash
 # trak size will be roughly TRAK_SCALE * screensize
 global TRAK_SCALE
-TRAK_SCALE = const(10)
+TRAK_SCALE = const(20)
 
 global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
@@ -193,21 +193,36 @@ def draw_trak_ui(name, num, fave):
 	disp.drawSprite(fave_heart)
 
 
-def draw_trak(camera, trak, preview = False):
+def draw_trak(camera, trak, preview = False, segment = None, segment_range = None):
 	global FONT_WIDTH, FONT_HEIGHT
 	if preview:
 		points = trak["preview"]
 	else:
 		points = trak["trak"]
-	for i in range(0, len(points), 2):
-		x0, y0 = view_transform(camera, points[i], points[i+1])
-		i1 = next_idx(i, points)
-		x1, y1 = view_transform(camera, points[i1], points[i1+1])
-		
-		if on_screen(x0, y0) or on_screen(x1, y1):
-			if i == 0:
-				draw_start_line(x0, y0, x1, y1)
-			disp.drawLine(x0, y0, x1, y1, 1)
+
+	if segment is None:
+		start = 0
+		end = len(points)
+	else:
+		start = ((segment - segment_range)*2) % len(points)
+		end = ((segment + segment_range)*2) % len(points)
+
+	if end < start:
+		# need two ranges at end/start of trak
+		sub_ranges = ((start, len(points)), (0, end),)
+	else:
+		sub_ranges = ((start, end),)
+	
+	for start, end in sub_ranges:
+		for i in range(start, end, 2):
+			x0, y0 = view_transform(camera, points[i], points[i+1])
+			i1 = next_idx(i, points)
+			x1, y1 = view_transform(camera, points[i1], points[i1+1])
+			
+			if on_screen(x0, y0) or on_screen(x1, y1):
+				if i == 0:
+					draw_start_line(x0, y0, x1, y1)
+				disp.drawLine(x0, y0, x1, y1, 1)
 
 
 def draw_racer(camera, racer, blocker):
@@ -219,6 +234,7 @@ def draw_racer(camera, racer, blocker):
 		blocker.x, blocker.y = racer["sprite"].x, racer["sprite"].y
 		disp.drawSprite(blocker)
 	disp.drawSprite(racer["sprite"])
+
 
 def offset_points(points, offset):
 	points_out = []
@@ -301,6 +317,7 @@ def generate_quadratic_bezier_points(segment_trak, key_step, n_curve_segments):
 		trak.append(x2)
 		trak.append(y2)
 	return trak
+
 
 # TODO: rewrite to be:
 # - more memory efficient > pre allocate trak list as [0.0] * length*2
@@ -439,11 +456,11 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
 	
 	util.dprint("checking dimensions")
 	bx, by, bw, bh = get_bounding_box(key_points)
-	
+
 	# find centre
 	cx = bx + bw/2
 	cy = by + bh/2
-	
+
 	trak_dict = {
 		"num": trak_num,
 		"name": name_seed,
@@ -497,7 +514,7 @@ def generate_trak(data, old_trak, trak_num, from_faves):
 		(int(max_width * 0.8), max_width),
 		(int(max_height * 0.8), max_height),
 		12, 2,
-		5, preview_segment_length)
+		10, preview_segment_length)
 
 
 def update_camera_preview(camera, trak):
@@ -533,9 +550,6 @@ def draw_trak_select(camera, trak):
 def trak_select(data, use_faves=False):
 	global FONT_WIDTH, FONT_HEIGHT
 	util.set_font(5, 7)
-	# Set the FPS (without this call, the default fps is 30)
-	# trak selection is targeting low fps:
-	disp.setFPS(15)
 	camera = get_camera()
 	if use_faves:
 		# copy of faves
@@ -580,8 +594,7 @@ def trak_select(data, use_faves=False):
 
 def update_racer(racer, trak):
 	points = trak["trak"]
-	racer["seg"] += 1
-	racer["seg"] %= len(trak["trak"])//2
+	racer["seg"] = (racer["seg"]+1) % (len(trak["trak"])//2)
 	update_racer_pos(racer, points)
 	update_racer_rot(racer, points)
 
@@ -597,7 +610,7 @@ def update_race(camera, racer, trak):
 
 def draw_race(camera, trak, racer, blocker, framerate):
 	disp.fill(0)
-	draw_trak(camera, trak)
+	draw_trak(camera, trak, segment=racer["seg"], segment_range=3)
 	
 	draw_racer(camera, racer, blocker)
 	
