@@ -13,9 +13,9 @@ import util
 import splash
 # trak size will be roughly TRAK_SCALE * screensize
 global TRAK_SCALE
-TRAK_SCALE = const(20)
+TRAK_SCALE = const(10)
 global TRAK_SEGMENT_LENGTH
-TRAK_SEGMENT_LENGTH = const(10)
+TRAK_SEGMENT_LENGTH = const(8)
 
 global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
@@ -40,7 +40,7 @@ global RACE_SEGMENT_RANGE
 RACE_SEGMENT_RANGE = ((max(SCREEN_W, SCREEN_H)//2) // TRAK_SEGMENT_LENGTH) + 1 
 
 global RACER_MAX_SPEED
-RACER_MAX_SPEED = 20
+RACER_MAX_SPEED = 8
 global RACER_ACCELERATION, RACER_DECCELERATION
 RACER_ACCELERATION = 0.1
 RACER_DECCELERATION = 0.2
@@ -166,7 +166,6 @@ def update_racer_pos(racer, points):
 	i0 = racer["seg"]*2 # double since points are x, y
 	i1 = next_idx(i0, points)
 	# get start/end of current segment
-	print(i0, len(points))
 	x0, y0 = points[i0], points[i0+1]
 	x1, y1 = points[i1], points[i1+1]
 	# interpolate along the segment
@@ -185,7 +184,28 @@ def update_racer_rot(racer, points):
 	# add pi/2 so up = 0 and % to change range 0<a<2pi
 	angle = (math.atan2(vy, vx) + (math.pi/2)) % (2*math.pi)
 	racer["r"] = angle
-	racer["sprite"].setFrame( int(angle / (2*math.pi)*8 + 0.5) % 8)
+	racer["sprite"].setFrame( get_rot_frame(racer["r"]) )
+
+
+def get_rot_frame(angle):
+	return int(angle / (2*math.pi)*8 + 0.5) % 8
+
+
+def get_rot_frame_offset(angle, size=2):
+	frame = get_rot_frame(angle)
+	# offsets per frame
+	frame_offsets = (
+		( 0,  1),
+		(-1,  1),
+		(-1,  0),
+		(-1, -1),
+		( 0, -1),
+		( 1, -1),
+		( 1,  0),
+		( 1,  1),
+	)
+	offset = (frame_offsets[frame][0]*size, frame_offsets[1]*size)
+	return frame_offsets[frame]
 
 
 def next_idx(i, trak):
@@ -245,14 +265,27 @@ def draw_trak(camera, trak, preview = False, segment = None, segment_range = Non
 				disp.drawLine(x0, y0, x1, y1, 1)
 
 
-def draw_racer(camera, racer, blocker):
-	racer["sprite"].x, racer["sprite"].y = view_transform(
-		camera, racer["x"], racer["y"])
-	racer["sprite"].x -= 3.5
-	racer["sprite"].y -= 3.5
+def draw_racer(camera, racer, blocker = None):
+	#a = int(racer["r"]*4*math.pi + 2*math.pi/16) / (4*math.pi)
+	#print(a)
+	#x_offset, y_offset = racer["x"] - 4*math.sin(a), racer["y"] + 4*math.cos(a)
+	#print(math.cos(racer["r"]), math.sin(racer["r"]), "\n")
+	sprite_x, sprite_y = view_transform(
+		camera, racer["x"], racer["y"])#x_offset, y_offset)
+
+	offset = get_rot_frame_offset(racer["r"])
+	sprite_x = sprite_x + offset[0] - 3.5
+	sprite_y = sprite_y + offset[1] - 3.5
+
+	racer["sprite"].x, racer["sprite"].y = sprite_x, sprite_y
 	if blocker:
-		blocker.x, blocker.y = racer["sprite"].x, racer["sprite"].y
+		blocker.x, blocker.y = sprite_x, sprite_y
+		#blocker.x, blocker.y = view_transform(
+		#camera, racer["x"], racer["y"])
+		#blocker.x -= 3.5
+		#blocker.y -= 3.5
 		disp.drawSprite(blocker)
+		#disp.drawRectangle(int(racer["sprite"].x+3.5-3), int(racer["sprite"].y+3.5-3), 5, 5, 1)
 	disp.drawSprite(racer["sprite"])
 
 
