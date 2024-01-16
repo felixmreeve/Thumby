@@ -144,8 +144,6 @@ def action_menu(path, entry):
 		if confirm("exit?"):
 			hard.reset()
 
-	
-
 
 def display_lines(lines):
 	disp.setFont("/lib/font5x7.bin", 5, 7, 1)

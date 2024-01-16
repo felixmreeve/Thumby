@@ -595,11 +595,13 @@ def update_race(camera, racer, trak):
 	update_camera(camera, racer)
 
 
-def draw_race(camera, racer, blocker, trak):
+def draw_race(camera, trak, racer, blocker, framerate):
 	disp.fill(0)
 	draw_trak(camera, trak)
 	
 	draw_racer(camera, racer, blocker)
+	
+	disp.drawText(str(next(framerate)), 1, 1, 1)
 	disp.update()
 
 
@@ -624,10 +626,12 @@ def race(trak, multiplayer = False):
 	)
 	# start in trak preview position
 	#update_camera_preview(camera, trak))
+	framerate = util.framerate()
 	while True:
 		#input()
 		if thumbyButton.buttonB.justPressed():
 			break
 		update_race(camera, racer, trak)
-		draw_race(camera, racer, blocker, trak)
+		draw_race(camera, trak, racer, blocker, framerate)
+		fps = next(framerate)
 	

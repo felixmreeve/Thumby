@@ -1,4 +1,5 @@
 from thumbyGraphics import display as disp
+import time
 
 global FONT_W, FONT_H
 FONT_W = const(5)
@@ -32,3 +33,14 @@ def dprint(*args, **kwargs):
 	global DEBUG_MODE
 	if DEBUG_MODE:
 		print(*args, **kwargs)
+
+
+def framerate():
+	old_time = time.ticks_us()
+	yield 0
+	while True:
+		new_time = time.ticks_us()
+		diff = time.ticks_diff(new_time, old_time)
+		fps = round(1000000/diff)
+		old_time = new_time
+		yield fps

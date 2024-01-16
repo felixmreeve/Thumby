@@ -299,7 +299,7 @@ def share_times(data):
 
 
 def demo_mode(data):
-	raise Exception("demo mode not implemented")
+	raise Exception("demo mode not")
 
 
 def main_menu():
