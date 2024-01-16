@@ -14,6 +14,8 @@ import splash
 # trak size will be roughly TRAK_SCALE * screensize
 global TRAK_SCALE
 TRAK_SCALE = const(20)
+global TRAK_SEGMENT_LENGTH
+TRAK_SEGMENT_LENGTH = const(10)
 
 global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
@@ -33,13 +35,23 @@ global TRAK_PREVIEW_W, TRAK_PREVIEW_H
 TRAK_PREVIEW_W = const(SCREEN_W - (FONT_W+1)*2)
 TRAK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
 
-bb = bytearray([14,17,33,66,33,17,14]),
+# how many trak segments to draw before/after center
+global RACE_SEGMENT_RANGE
+RACE_SEGMENT_RANGE = ((max(SCREEN_W, SCREEN_H)//2) // TRAK_SEGMENT_LENGTH) + 1 
+
+global RACER_MAX_SPEED
+RACER_MAX_SPEED = 20
+global RACER_ACCELERATION, RACER_DECCELERATION
+RACER_ACCELERATION = 0.1
+RACER_DECCELERATION = 0.2
+
 fave_heart = sprite.Sprite(
 	7, 7,
 	bytearray([14,17,33,66,33,17,14,14,31,63,126,63,31,14]),
 	1, 1,
 	0
 )
+
 
 def add_fave(data, trak_name):
 	fave_names = data["fave_names"]
@@ -141,6 +153,7 @@ def get_racer(sprite):
 		"seg": 0, # segment on track
 		"t": 0, # t interpolation value along segment
 		"r": 0, # rotation
+		"v": 0, # velocity
 		"x": 0,
 		"y": 0,
 		"sprite": sprite
@@ -149,8 +162,16 @@ def get_racer(sprite):
 
 
 def update_racer_pos(racer, points):
-	i = racer["seg"]*2 # double since points are x, y
-	racer["x"], racer["y"] = points[i], points[i+1]
+	t = racer["t"]
+	i0 = racer["seg"]*2 # double since points are x, y
+	i1 = next_idx(i0, points)
+	# get start/end of current segment
+	print(i0, len(points))
+	x0, y0 = points[i0], points[i0+1]
+	x1, y1 = points[i1], points[i1+1]
+	# interpolate along the segment
+	racer["x"] = (1-t)*x0 + t*x1
+	racer["y"] = (1-t)*y0 + t*y1
 
 
 def update_racer_rot(racer, points):
@@ -205,20 +226,19 @@ def draw_trak(camera, trak, preview = False, segment = None, segment_range = Non
 		end = len(points)
 	else:
 		start = ((segment - segment_range)*2) % len(points)
-		end = ((segment + segment_range)*2) % len(points)
+		end = ((segment + segment_range+1)*2) % len(points)
 
 	if end < start:
 		# need two ranges at end/start of trak
 		sub_ranges = ((start, len(points)), (0, end),)
 	else:
 		sub_ranges = ((start, end),)
-	
+
 	for start, end in sub_ranges:
 		for i in range(start, end, 2):
 			x0, y0 = view_transform(camera, points[i], points[i+1])
 			i1 = next_idx(i, points)
 			x1, y1 = view_transform(camera, points[i1], points[i1+1])
-			
 			if on_screen(x0, y0) or on_screen(x1, y1):
 				if i == 0:
 					draw_start_line(x0, y0, x1, y1)
@@ -254,9 +274,7 @@ def generate_key_points(width, height, n_key_points):
 		a = i/n_key_points * 2 * math.pi
 		vx = math.sin(a)
 		vy = math.cos(a)
-		
 		dist = random.uniform(0.1, 0.9)
-
 		x = cx + vx * dist * width/2
 		y = cy + vy * dist * height/2
 		trak.append(x)
@@ -379,10 +397,10 @@ def get_bounding_box(point_list):
 	max_x, max_y = int(max_x+0.5), int(max_y+0.5)
 	w = max_x - min_x
 	h = max_y - min_y
-	
+
 	x_coords = sorted(point_list[::2])
 	y_coords = sorted(point_list[1::2])
-	
+
 	return min_x, min_y, w, h
 
 
@@ -416,7 +434,7 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
 	disp.fill(0)
 	draw_trak_ui(name_seed, trak_num, fave)
 	disp.update()
-	
+
 	# if we use the name as the seed
 	# we can share traks via the name
 	# add seed together from first/second part
@@ -426,7 +444,7 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
 	name_seed_part2 = int.from_bytes(name_parts[-1].encode(), 'big')
 	name_seed_int = name_seed_part1 + name_seed_part2
 	random.seed(name_seed_int)
-	
+
 	if not type(width) == int:
 		width = random.randint(width[0], width[1])
 	if not type(height) == int:
@@ -436,7 +454,7 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
 	key_points = generate_key_points(
 		width, height,
 		n_key_points)
-	
+
 	util.dprint("generating mid points")
 	trak = generate_mid_points(key_points, n_segment_points)
 	
@@ -450,10 +468,10 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
 
 	util.dprint("resampling")
 	trak, seg_dist = resample_trak(trak, resample_segment_length, cleanup = True)
-	
+
 	util.dprint("generating preview")
 	preview_points, preview_seg_dist = resample_trak(trak, preview_segment_length)
-	
+
 	util.dprint("checking dimensions")
 	bx, by, bw, bh = get_bounding_box(key_points)
 
@@ -480,7 +498,7 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
 def generate_trak(data, old_trak, trak_num, from_faves):
 	# wrapper around _generate_trak
 	# so that consistent inputs can be set here
-	global TRAK_SCALE
+	global TRAK_SCALE, TRAK_SEGMENT_LENGTH
 	# clean up old trak for memory reasons first!
 	if old_trak:
 		old_trak.clear()
@@ -489,7 +507,7 @@ def generate_trak(data, old_trak, trak_num, from_faves):
 	preview_segment_length = 2 * TRAK_SCALE
 	max_width = SCREEN_W * TRAK_SCALE
 	max_height = SCREEN_H * TRAK_SCALE
-	
+
 	util.dprint("generating_trak")
 	if from_faves:
 		name = from_faves[trak_num]
@@ -500,21 +518,21 @@ def generate_trak(data, old_trak, trak_num, from_faves):
 		
 		util.dprint("naming trak")
 		name = generate_trak_name()
-	
+
 	# need to check fave status against saved faves
 	if name in data["fave_names"]:
 		fave = True
 	else:
 		fave = False
-	
+
 	util.dprint(f"name {name}")
-	
+
 	return _generate_trak(
 		trak_num, name, fave,
 		(int(max_width * 0.8), max_width),
 		(int(max_height * 0.8), max_height),
 		12, 2,
-		10, preview_segment_length)
+		TRAK_SEGMENT_LENGTH, preview_segment_length)
 
 
 def update_camera_preview(camera, trak):
@@ -594,7 +612,20 @@ def trak_select(data, use_faves=False):
 
 def update_racer(racer, trak):
 	points = trak["trak"]
-	racer["seg"] = (racer["seg"]+1) % (len(trak["trak"])//2)
+
+	if racer["v"] < RACER_MAX_SPEED \
+	and thumbyButton.buttonA.pressed():
+		racer["v"] += RACER_ACCELERATION
+	else:
+		racer["v"] -= RACER_DECCELERATION
+		racer["v"] = max(0, racer["v"])
+	# move along segment by velocity
+	racer["t"] += racer["v"] / TRAK_SEGMENT_LENGTH
+	# move to next segment if t > 1
+	while racer["t"] >= 1:
+		racer["seg"] = (racer["seg"] + 1) % (len(points)//2)
+		racer["t"] -=1
+
 	update_racer_pos(racer, points)
 	update_racer_rot(racer, points)
 
@@ -609,12 +640,13 @@ def update_race(camera, racer, trak):
 
 
 def draw_race(camera, trak, racer, blocker, framerate):
+	global RACE_SEGMENT_RANGE
 	disp.fill(0)
-	draw_trak(camera, trak, segment=racer["seg"], segment_range=3)
-	
+	draw_trak(camera, trak, segment=racer["seg"], segment_range=RACE_SEGMENT_RANGE)
+
 	draw_racer(camera, racer, blocker)
-	
-	disp.drawText(str(next(framerate)), 1, 1, 1)
+	# framerate in corner
+	#disp.drawText(str(next(framerate)), 1, 1, 1)
 	disp.update()
 
 
