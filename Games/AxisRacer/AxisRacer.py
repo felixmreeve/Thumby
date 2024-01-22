@@ -209,8 +209,9 @@ def named_players_menu(player_names = [], min_players = 2, title = "players:"):
 			return player_names
 
 
-def trak_menu(data, choice = 0):
+def trak_menu(data):
 	while True:
+		# reset previously selected trak to clear memory
 		trak = None
 		choice = menu(
 			"trak list",
@@ -222,13 +223,13 @@ def trak_menu(data, choice = 0):
 		if choice == -1:
 			break
 		elif choice == 0:
-			trak = traklib.trak_select(data, use_faves=False)
+			trak = traklib.trak_select(data, selection=trak_num, use_faves=False)
 		elif choice == 1:
 			util.dprint("no of faves: ", len(data["fave_names"]))
 			if len(data["fave_names"]) == 0:
 				splash.no_faves_splash()
 			else:
-				trak = traklib.trak_select(data, use_faves=True)
+				trak = traklib.trak_select(data, selection=trak_num, use_faves=True)
 		elif choice == 2:
 			trak_name = inpt.keyboard()
 			if trak_name:
@@ -237,17 +238,16 @@ def trak_menu(data, choice = 0):
 					traklib.remove_fave(data,trak_name)
 				traklib.add_fave(data, trak_name)
 				choice = 1
-				trak = traklib.trak_select(data, use_faves=True)
+				trak = traklib.trak_select(data, selection=trak_num, use_faves=True)
 		if trak:
 			break
 	return trak
 
 
 def one_player(data):
-	choice = 0
 	while True:
 		trak = None
-		trak = trak_menu(data, choice)
+		trak = trak_menu(data)
 		if trak:
 			choice = trak["num"]
 			traklib.race(trak, multiplayer = False)

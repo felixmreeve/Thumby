@@ -45,12 +45,14 @@ global RACER_ACCELERATION, RACER_DECCELERATION
 RACER_ACCELERATION = 0.1
 RACER_DECCELERATION = 0.2
 
-fave_heart = sprite.Sprite(
-	7, 7,
-	bytearray([14,17,33,66,33,17,14,14,31,63,126,63,31,14]),
-	1, 1,
-	0
-)
+
+def get_fave_heart():
+	return sprite.Sprite(
+		7, 7,
+		bytearray([14,17,33,66,33,17,14,14,31,63,126,63,31,14]),
+		1, 1,
+		0
+	)
 
 
 def add_fave(data, trak_name):
@@ -230,6 +232,7 @@ def draw_trak_ui(name, num, fave):
 		SCREEN_W - FONT_W,
 		(SCREEN_H - FONT_H) // 2,
 		1)
+	fave_heart = get_fave_heart()
 	fave_heart.setFrame(int(fave))
 	disp.drawSprite(fave_heart)
 
@@ -307,7 +310,7 @@ def generate_key_points(width, height, n_key_points):
 		a = i/n_key_points * 2 * math.pi
 		vx = math.sin(a)
 		vy = math.cos(a)
-		dist = random.uniform(0.1, 0.9)
+		dist = random.uniform(0.1, 1.0)
 		x = cx + vx * dist * width/2
 		y = cy + vy * dist * height/2
 		trak.append(x)
@@ -598,7 +601,7 @@ def draw_trak_select(camera, trak):
 	disp.update()
 
 
-def trak_select(data, use_faves=False):
+def trak_select(data, selection = 0, use_faves=False):
 	global FONT_WIDTH, FONT_HEIGHT
 	util.set_font(5, 7)
 	camera = get_camera()
@@ -611,7 +614,7 @@ def trak_select(data, use_faves=False):
 		max_traks = 0
 
 	util.dprint(f"max_traks is {max_traks}")
-	trak_num = 0
+	trak_num = selection
 	trak = generate_trak(data, None, trak_num, from_faves)
 	util.dprint("entering trak select loop")
 	while True:
@@ -640,7 +643,7 @@ def trak_select(data, use_faves=False):
 			toggle_fave(data, trak)
 		update_camera_preview(camera, trak)
 		draw_trak_select(camera, trak)
-	return trak
+	return trak, selection
 
 
 def update_racer(racer, trak):
