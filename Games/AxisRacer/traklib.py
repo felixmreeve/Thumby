@@ -448,8 +448,8 @@ def pick_line(file_name):
 
 def generate_trak_name():
 	global GAME_NAME
-	adjectives_file = f"/Games/{GAME_NAME}/words/adjectives.txt"
-	nouns_file = f"/Games/{GAME_NAME}/words/nouns.txt"
+	adjectives_file = f"/Games/{GAME_NAME}/assets/adjectives.txt"
+	nouns_file = f"/Games/{GAME_NAME}/assets/nouns.txt"
 	adjective = pick_line(adjectives_file)
 	noun = pick_line(nouns_file)
 	name = f"{adjective} {noun}"
