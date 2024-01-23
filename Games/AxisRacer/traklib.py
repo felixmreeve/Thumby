@@ -3,13 +3,13 @@ import random
 
 import thumbyButton
 from thumbyGraphics import display as disp
-from thumbySaves import saveData as save
 import thumbySprite as sprite
 
 global GAME_NAME
 GAME_NAME = "AxisRacer"
 
 import util
+import save
 import splash
 # trak size will be roughly TRAK_SCALE * screensize
 global TRAK_SCALE
@@ -55,27 +55,14 @@ def get_fave_heart():
     )
 
 
-def add_fave(data, trak_name):
-    fave_names = data["fave_names"]
-    # put new faves at the front of the list
-    fave_names.insert(0, trak_name)
-    save.save()
-
-
-def remove_fave(data, trak_name):
-    fave_names = data["fave_names"]
-    fave_names.remove(trak_name)
-    save.save()
-
-
-def toggle_fave(data, trak):
+def toggle_fave(trak):
     trak_name = trak["name"]
-    if trak_name in data["fave_names"]:
+    if save.in_faves(trak_name):
         trak["fave"] = False
-        remove_fave(data, trak_name)
+        save.remove_fave(trak_name)
     else:
         trak["fave"] = True
-        add_fave(data, trak_name)
+        save.add_fave(trak_name)
 
 
 def on_screen(x, y):
@@ -531,7 +518,7 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
     return trak_dict
 
 
-def generate_trak(data, old_trak, trak_num, from_faves):
+def generate_trak(seed, old_trak, trak_num, from_faves):
     # wrapper around _generate_trak
     # so that consistent inputs can be set here
     global TRAK_SCALE, TRAK_SEGMENT_LENGTH
@@ -548,7 +535,7 @@ def generate_trak(data, old_trak, trak_num, from_faves):
     if from_faves:
         name = from_faves[trak_num]
     else:
-        trak_seed = data["seed"] + trak_num
+        trak_seed = seed + trak_num
         util.dprint(f"with seed {trak_seed}")
         random.seed(trak_seed)
         
@@ -556,7 +543,8 @@ def generate_trak(data, old_trak, trak_num, from_faves):
         name = generate_trak_name()
 
     # need to check fave status against saved faves
-    if name in data["fave_names"]:
+    # even if we're not in faves currently
+    if save.in_faves(name):
         fave = True
     else:
         fave = False
@@ -601,49 +589,54 @@ def draw_trak_select(camera, trak):
     disp.update()
 
 
-def trak_select(data, selection = 0, use_faves=False):
+def trak_select(selection = 0, use_faves=False, multiplayer=False, view_only=False):
     global FONT_WIDTH, FONT_HEIGHT
+    seed = save.load_seed()
+    
     util.set_font(5, 7)
     camera = get_camera()
     if use_faves:
         # copy of faves
-        from_faves = data["fave_names"][:]
-        max_traks = len(from_faves)
+        faves = save.load_faves()[:]
+        max_traks = save.num_faves()
     else:
-        from_faves = None
+        faves = None
         max_traks = 0
 
     util.dprint(f"max_traks is {max_traks}")
     trak_num = selection
-    trak = generate_trak(data, None, trak_num, from_faves)
+    trak = generate_trak(seed, None, trak_num, faves)
     util.dprint("entering trak select loop")
     while True:
-        if (not max_traks or trak_num < max_traks) \
-        and thumbyButton.buttonR.pressed():
-            if trak_num == max_traks-1:
-                # if we reach the end of max_traks
-                splash.end_faves_splash()
-            else:
-                trak_num += 1
-            #trak = []
-            trak = generate_trak(data, trak, trak_num, from_faves)
-        if trak_num > 0 and thumbyButton.buttonL.pressed():
-            trak_num -= 1
-            #trak = []
-            trak = generate_trak(data, trak, trak_num, from_faves)
-        #hold in loop until a is pressed
-        if thumbyButton.buttonA.justPressed():
-            # trak is chosen
-            break
-        if thumbyButton.buttonB.justPressed():
-            # cancel
-            trak = []
-            break
-        if thumbyButton.buttonU.justPressed():
-            toggle_fave(data, trak)
+        if not view_only:
+            if (not max_traks or trak_num < max_traks) \
+            and thumbyButton.buttonR.pressed():
+                if trak_num == max_traks-1:
+                    # if we reach the end of max_traks
+                    splash.end_faves_splash()
+                else:
+                    trak_num += 1
+                #trak = []
+                trak = generate_trak(seed, trak, trak_num, faves)
+            if trak_num > 0 and thumbyButton.buttonL.pressed():
+                trak_num -= 1
+                #trak = []
+                trak = generate_trak(seed, trak, trak_num, faves)
+            #hold in loop until a is pressed
+            if thumbyButton.buttonA.justPressed():
+                # trak is chosen
+                break
+            if thumbyButton.buttonB.justPressed():
+                # cancel
+                trak = []
+                break
+            if thumbyButton.buttonU.justPressed():
+                toggle_fave(trak)
+        else:
+            pass
         update_camera_preview(camera, trak)
         draw_trak_select(camera, trak)
-    return trak, selection
+    return trak
 
 
 def update_racer(racer, trak):

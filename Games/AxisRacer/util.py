@@ -1,6 +1,9 @@
 from thumbyGraphics import display as disp
 import time
 
+global GAME_NAME
+GAME_NAME = "AxisRacer"
+
 global FONT_W, FONT_H
 FONT_W = const(5)
 FONT_H = const(7)
@@ -15,11 +18,24 @@ global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
 SCREEN_H = const(40)
 
+global EMULATOR
+try:
+    import emulator
+except ImportError:
+    EMULATOR = False
+else:
+    EMULATOR = True
 
 # ********** master debug flag **********
 global DEBUG_MODE
-DEBUG_MODE = False
+DEBUG_MODE = True
 # ***************************************
+# extra debug flags
+global DEBUG_ON_DEVICE, DEBUG_FIXED_SEED
+DEBUG_ON_DEVICE = False
+DEBUG_FIXED_SEED = True
+if not EMULATOR:
+    DEBUG_MODE = DEBUG_ON_DEVICE
 
 
 def set_font(w, h):
@@ -44,3 +60,8 @@ def framerate():
         fps = round(1000000/diff)
         old_time = new_time
         yield fps
+
+
+def new_seed():
+    return time.ticks_cpu()
+

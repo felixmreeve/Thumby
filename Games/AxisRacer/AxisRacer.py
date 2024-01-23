@@ -8,16 +8,17 @@ import math
 import time
 import sys
 
-#import thumby
+import thumby
 import thumbyButton
 from thumbyGraphics import display as disp
-from thumbySaves import saveData as save
 import thumbyHardware as hard
 # import game libs
 if not f"/Games/{GAME_NAME}" in sys.path:
     sys.path.append(f"/Games/{GAME_NAME}")
+
 import util
 import inpt
+import save
 import splash
 import traklib
 import multi
@@ -63,49 +64,7 @@ if not EMULATOR:
 def reroll_traks(data):
     # get user confirmation
     if splash.reroll_splash():
-        seed = new_seed()
-        save.setItem("seed", seed)
-        data["seed"] = seed
-        save.save()
-
-
-def new_seed():
-    return time.ticks_cpu()
-
-
-def load_data():
-    global GAME_NAME
-    global DEBUG_MODE, DEBUG_FIXED_SEED
-    util.dprint("loading data")
-    save.setName(GAME_NAME)
-    updated = False
-    
-    if save.hasItem("seed"):
-        util.dprint("loading seed")
-        seed = save.getItem("seed")
-    
-    else:
-        seed = new_seed()
-        util.dprint(f"generating seed save {seed}")
-        save.setItem("seed", seed)
-        updated = True
-        
-    if save.hasItem("fave_names"):
-        fave_names = save.getItem("fave_names")
-    else:
-        fave_names = []
-        save.setItem("fave_names", fave_names)
-        updated = True
-    
-    if updated:
-        save.save()
-    
-    if DEBUG_MODE and DEBUG_FIXED_SEED: seed = 0
-    data = {
-        "seed": seed,
-        "fave_names": fave_names
-    }
-    return data
+        save.new_seed()
 
 
 def menu(*choices, selection=0, title=""):
@@ -209,7 +168,7 @@ def named_players_menu(player_names = [], min_players = 2, title = "players:"):
             return player_names
 
 
-def trak_menu(data):
+def trak_menu():
     choice = 0
     while True:
         # reset previously selected trak to clear memory
@@ -224,22 +183,22 @@ def trak_menu(data):
         if choice == -1:
             break
         elif choice == 0:
-            trak = traklib.trak_select(data, selection=0, use_faves=False)
+            trak = traklib.trak_select(selection=0, use_faves=False)
         elif choice == 1:
-            util.dprint("no of faves: ", len(data["fave_names"]))
-            if len(data["fave_names"]) == 0:
+            if save.num_faves() == 0:
                 splash.no_faves_splash()
             else:
-                trak = traklib.trak_select(data, selection=0, use_faves=True)
+                trak = traklib.trak_select(selection=0, use_faves=True)
         elif choice == 2:
             trak_name = inpt.keyboard()
+            # add generated trak to faves
             if trak_name:
                 # if it's already in faves, unfave then refave
-                if trak_name in data["fave_names"]:
-                    traklib.remove_fave(data,trak_name)
-                traklib.add_fave(data, trak_name)
+                if save.in_faves(trak_name):
+                    save.remove_fave(trak_name)
+                save.add_fave(trak_name)
                 choice = 1
-                trak = traklib.trak_select(data, selection=0, use_faves=True)
+                trak = traklib.trak_select(selection=0, use_faves=True)
         if trak:
             break
     return trak
@@ -253,6 +212,7 @@ def waiting_for_trak():
         disp.fill(0)
         disp.drawText("waiting for", 1, 1, 1)
         disp.drawText("trak", 1, 8, 1)
+        disp.update()
 
 
 def handshake():
@@ -280,10 +240,10 @@ def handshake():
     return player_num
 
 
-def one_player(data):
+def one_player():
     while True:
         trak = None
-        trak = trak_menu(data)
+        trak = trak_menu()
         if trak:
             choice = trak["num"]
             traklib.race(trak, multiplayer = False)
@@ -291,7 +251,7 @@ def one_player(data):
             break
 
 
-def two_player(data):
+def two_player():
     player_num = handshake()
     if not player_num:
         return
@@ -299,7 +259,7 @@ def two_player(data):
     while True:
         if player_num == 1:
             trak = None
-            trak = trak_menu(data)
+            trak = trak_menu()
             if trak:
                 traklib.race(trak, multiplayer = True)
             else:
@@ -310,48 +270,47 @@ def two_player(data):
             raise RuntimeError(f"player_num is {player_num}")
 
 
-def hot_seat(data):
+def hot_seat():
     # choose players
     player_names = named_players_menu(title="hotseat:")
     if player_names:
         while True:
             trak = None
-            trak = trak_menu(data)
+            trak = trak_menu()
             if trak:
                 time_trial_race(trak, player_names)
             else:
                 break
 
 
-def time_trial(data):
+def time_trial():
     while True:
         trak = None
-        trak = trak_menu(data)
+        trak = trak_menu()
         if trak:
             time_trial_race(trak)
         else:
             break
 
 
-def tournament(data):
+def tournament():
     player_names = named_players_menu()
     raise Exception("tournament not implemented")
 
-            
-def achievements(data):
+
+def achievements():
     raise Exception("achievements not implemented")
 
 
-def share_times(data):
+def share_times():
     raise Exception("share times not implemented")
 
 
-def demo_mode(data):
+def demo_mode():
     raise Exception("demo mode not")
 
 
 def main_menu():
-    data = load_data()
     choice = 0
     while True:
         choice = menu(
@@ -368,25 +327,25 @@ def main_menu():
             title = "menu:"
         )
         if choice == -1:
-            break # back out to splash and reload data
+            break # back out to splash
         elif choice == 0: # 1 player
-            one_player(data)
+            one_player()
         elif choice == 1: # 2 player
-            two_player(data)
+            two_player()
         elif choice == 2: # hot seat
-            hot_seat(data)
+            hot_seat()
         elif choice == 3: # time trial
-            time_trial(data)
+            time_trial()
         elif choice == 4: # tournament
-            tournament(data)
+            tournament()
         elif choice == 5: # achievements
-            achievements(data)
+            achievements()
         elif choice == 6: # share times
-            share_times(data)
+            share_times()
         elif choice == 7: # demo mode
-            demo_mode(data)
+            demo_mode()
         elif choice == 8: # reroll traks
-            reroll_traks(data)
+            reroll_traks()
             choice = 0 # reset choice to 1 player so they can see new traks
 
 
@@ -394,6 +353,7 @@ def main():
     while True:
         start = splash.main_splash()
         if start:
+            save.init()
             main_menu()
         else:
             # quit
