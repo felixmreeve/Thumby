@@ -245,6 +245,16 @@ def trak_menu(data):
     return trak
 
 
+def waiting_for_trak():
+    disp.setFPS(30)
+    util.set_font(FONT_W, FONT_H)
+    while True:
+        # draw trak???
+        disp.fill(0)
+        disp.drawText("waiting for", 1, 1, 1)
+        disp.drawText("trak", 1, 8, 1)
+
+
 def handshake():
     player_num = 0
     disp.setFPS(30)
@@ -285,13 +295,19 @@ def two_player(data):
     player_num = handshake()
     if not player_num:
         return
+
     while True:
+        if player_num == 1:
             trak = None
             trak = trak_menu(data)
             if trak:
                 traklib.race(trak, multiplayer = True)
             else:
                 break
+        elif player_num == 2:
+            waiting_for_trak()
+        else:
+            raise RuntimeError(f"player_num is {player_num}")
 
 
 def hot_seat(data):
