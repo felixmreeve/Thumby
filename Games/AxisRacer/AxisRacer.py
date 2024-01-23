@@ -210,6 +210,7 @@ def named_players_menu(player_names = [], min_players = 2, title = "players:"):
 
 
 def trak_menu(data):
+	choice = 0
 	while True:
 		# reset previously selected trak to clear memory
 		trak = None
@@ -223,13 +224,13 @@ def trak_menu(data):
 		if choice == -1:
 			break
 		elif choice == 0:
-			trak = traklib.trak_select(data, selection=trak_num, use_faves=False)
+			trak = traklib.trak_select(data, selection=0, use_faves=False)
 		elif choice == 1:
 			util.dprint("no of faves: ", len(data["fave_names"]))
 			if len(data["fave_names"]) == 0:
 				splash.no_faves_splash()
 			else:
-				trak = traklib.trak_select(data, selection=trak_num, use_faves=True)
+				trak = traklib.trak_select(data, selection=0, use_faves=True)
 		elif choice == 2:
 			trak_name = inpt.keyboard()
 			if trak_name:
@@ -238,21 +239,35 @@ def trak_menu(data):
 					traklib.remove_fave(data,trak_name)
 				traklib.add_fave(data, trak_name)
 				choice = 1
-				trak = traklib.trak_select(data, selection=trak_num, use_faves=True)
+				trak = traklib.trak_select(data, selection=0, use_faves=True)
 		if trak:
 			break
 	return trak
 
 
 def handshake():
+	player_num = 0
+	disp.setFPS(30)
+	util.set_font(FONT_W, FONT_H)
 	while True:
 		disp.fill(0)
 		disp.drawText("waiting for", 1, 1, 1)
 		disp.drawText("connection", 1, 8, 1)
 		multi.send_handshake()
-		if multi.receive_handshake():
-			raise RunTimeError("successful handshake")
+		result = multi.receive_handshake()
+		if result:
+			player_num = result
+		if player_num:
+			disp.drawText("success!", 1, 16, 1)
+			# send an additional handshake for half-duplex
+			multi.send_handshake(player_num)
+			multi.receive_handshake()
+			break
 		disp.update()
+		if thumbyButton.buttonB.justPressed():
+			break
+		
+	return player_num
 
 
 def one_player(data):
@@ -267,14 +282,16 @@ def one_player(data):
 
 
 def two_player(data):
-	if handshake():
-		while True:
-				trak = None
-				trak = trak_menu(data)
-				if trak:
-					traklib.race(trak, multiplayer = True)
-				else:
-					break
+	player_num = handshake()
+	if not player_num:
+		return
+	while True:
+			trak = None
+			trak = trak_menu(data)
+			if trak:
+				traklib.race(trak, multiplayer = True)
+			else:
+				break
 
 
 def hot_seat(data):
