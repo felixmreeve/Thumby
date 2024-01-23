@@ -23,24 +23,24 @@ DEBUG_MODE = False
 
 
 def set_font(w, h):
-	disp.setFont(
-		f"/lib/font{w}x{h}.bin",
-		w, h,
-		1)
+    disp.setFont(
+        f"/lib/font{w}x{h}.bin",
+        w, h,
+        1)
 
 
 def dprint(*args, **kwargs):
-	global DEBUG_MODE
-	if DEBUG_MODE:
-		print(*args, **kwargs)
+    global DEBUG_MODE
+    if DEBUG_MODE:
+        print(*args, **kwargs)
 
 
 def framerate():
-	old_time = time.ticks_us()
-	yield 0
-	while True:
-		new_time = time.ticks_us()
-		diff = time.ticks_diff(new_time, old_time)
-		fps = round(1000000/diff)
-		old_time = new_time
-		yield fps
+    old_time = time.ticks_us()
+    yield 0
+    while True:
+        new_time = time.ticks_us()
+        diff = time.ticks_diff(new_time, old_time)
+        fps = round(1000000/diff)
+        old_time = new_time
+        yield fps
