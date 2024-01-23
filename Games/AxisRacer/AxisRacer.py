@@ -13,7 +13,6 @@ import thumbyButton
 from thumbyGraphics import display as disp
 from thumbySaves import saveData as save
 import thumbyHardware as hard
-from thumbyLink import link
 # import game libs
 if not f"/Games/{GAME_NAME}" in sys.path:
 	sys.path.append(f"/Games/{GAME_NAME}")
@@ -21,6 +20,7 @@ import util
 import inpt
 import splash
 import traklib
+import multi
 
 global FONT_W, FONT_H
 FONT_W = const(5)
@@ -244,6 +244,17 @@ def trak_menu(data):
 	return trak
 
 
+def handshake():
+	while True:
+		disp.fill(0)
+		disp.drawText("waiting for", 1, 1, 1)
+		disp.drawText("connection", 1, 8, 1)
+		multi.send_handshake()
+		if multi.receive_handshake():
+			raise RunTimeError("successful handshake")
+		disp.update()
+
+
 def one_player(data):
 	while True:
 		trak = None
@@ -256,17 +267,14 @@ def one_player(data):
 
 
 def two_player(data):
-	while True:
-		# TODO: add link cable check
-		if link_cable_response():
-			trak = None
-			trak = trak_menu(data)
-			if trak:
-				traklib.race(trak, multiplayer = True)
-			else:
-				break
-		else:
-			splash.no_cable_response()
+	if handshake():
+		while True:
+				trak = None
+				trak = trak_menu(data)
+				if trak:
+					traklib.race(trak, multiplayer = True)
+				else:
+					break
 
 
 def hot_seat(data):
@@ -290,6 +298,7 @@ def time_trial(data):
 			time_trial_race(trak)
 		else:
 			break
+
 
 def tournament(data):
 	player_names = named_players_menu()
