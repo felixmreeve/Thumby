@@ -15,10 +15,11 @@ def load_seed():
     return seed
 
 
-def reset_seed(seed):
+def reset_seed():
     seed = util.new_seed()
     util.dprint(f"generating seed save {seed}")
     saveData.setItem("seed", seed)
+    saveData.save()
 
 
 def reset_faves():

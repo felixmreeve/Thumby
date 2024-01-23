@@ -56,15 +56,9 @@ DEBUG_MODE = True
 # extra debug flags
 global DEBUG_ON_DEVICE, DEBUG_FIXED_SEED
 DEBUG_ON_DEVICE = False
-DEBUG_FIXED_SEED = True
+DEBUG_FIXED_SEED = False
 if not EMULATOR:
     DEBUG_MODE = DEBUG_ON_DEVICE
-
-
-def reroll_traks(data):
-    # get user confirmation
-    if splash.reroll_splash():
-        save.new_seed()
 
 
 def menu(*choices, selection=0, title=""):
@@ -308,6 +302,13 @@ def share_times():
 
 def demo_mode():
     raise Exception("demo mode not")
+
+
+def reroll_traks():
+    # get user confirmation
+    if splash.reroll_splash():
+        util.dprint("rerolling seed")
+        save.reset_seed()
 
 
 def main_menu():
