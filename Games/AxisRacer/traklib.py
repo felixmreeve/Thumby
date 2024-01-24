@@ -11,6 +11,7 @@ GAME_NAME = "AxisRacer"
 import util
 import save
 import splash
+import multi
 # trak size will be roughly TRAK_SCALE * screensize
 global TRAK_SCALE
 TRAK_SCALE = const(10)
@@ -518,18 +519,27 @@ def _generate_trak(trak_num, name_seed, fave, width, height, n_key_points, n_seg
     return trak_dict
 
 
-def generate_trak(seed, old_trak, trak_num, from_faves):
+def generate_trak_from_name(trak_num, name, fave):
     # wrapper around _generate_trak
     # so that consistent inputs can be set here
     global TRAK_SCALE, TRAK_SEGMENT_LENGTH
-    # clean up old trak for memory reasons first!
-    if old_trak:
-        old_trak.clear()
     # preview_segment_length will be roughly X pixels onscreen
-    # if set to X * TRAK_SCALE
+    # in preview, if set to X * TRAK_SCALE
     preview_segment_length = 2 * TRAK_SCALE
     max_width = SCREEN_W * TRAK_SCALE
     max_height = SCREEN_H * TRAK_SCALE
+    return _generate_trak(
+        trak_num, name, fave,
+        (int(max_width * 0.8), max_width),
+        (int(max_height * 0.8), max_height),
+        12, 2,
+        TRAK_SEGMENT_LENGTH, preview_segment_length)
+
+
+def generate_trak(seed, old_trak, trak_num, from_faves, multilink):
+    # clean up old trak for memory reasons first!
+    if old_trak:
+        old_trak.clear()
 
     util.dprint("generating_trak")
     if from_faves:
@@ -550,13 +560,12 @@ def generate_trak(seed, old_trak, trak_num, from_faves):
         fave = False
 
     util.dprint(f"name {name}")
+    
+    if multilink:
+        multi.receieve_null()
+        multi.send_trak(name)
 
-    return _generate_trak(
-        trak_num, name, fave,
-        (int(max_width * 0.8), max_width),
-        (int(max_height * 0.8), max_height),
-        12, 2,
-        TRAK_SEGMENT_LENGTH, preview_segment_length)
+    return generate_trak_from_name(trak_num, name, fave)
 
 
 def update_camera_preview(camera, trak):
@@ -589,7 +598,31 @@ def draw_trak_select(camera, trak):
     disp.update()
 
 
-def trak_select(selection = 0, use_faves=False, multiplayer=False, view_only=False):
+def waiting_for_trak_select():
+    global FONT_W, FONT_H
+    disp.setFPS(30)
+    util.set_font(FONT_W, FONT_H)
+    disp.drawText("waiting for", 0, 0, 1)
+    disp.drawText("trak select", 0, FONT_H, 1)
+    camera = get_camera()
+    trak = {}
+    while True:
+        multi.send_null()
+        received = multi.receieve_trak()
+        if received != None:
+            code, trak_name = receieved
+            # clear for memory reasons
+            trak.clear()
+            trak = generate_trak_from_name(-1, trak_name, None)
+        if "condition" == "somehowbreak":
+            break
+        if trak:
+            update_camera_preview(camera, trak)
+            draw_trak_select(camera, trak)
+    return trak
+
+
+def trak_select(selection = 0, use_faves=False, multilink=False):
     global FONT_WIDTH, FONT_HEIGHT
     seed = save.load_seed()
     
@@ -605,35 +638,33 @@ def trak_select(selection = 0, use_faves=False, multiplayer=False, view_only=Fal
 
     util.dprint(f"max_traks is {max_traks}")
     trak_num = selection
-    trak = generate_trak(seed, None, trak_num, faves)
+    trak = generate_trak(seed, None, trak_num, faves, multilink)
     util.dprint("entering trak select loop")
     while True:
-        if not view_only:
-            if (not max_traks or trak_num < max_traks) \
-            and thumbyButton.buttonR.pressed():
-                if trak_num == max_traks-1:
-                    # if we reach the end of max_traks
-                    splash.end_faves_splash()
-                else:
-                    trak_num += 1
-                #trak = []
-                trak = generate_trak(seed, trak, trak_num, faves)
-            if trak_num > 0 and thumbyButton.buttonL.pressed():
-                trak_num -= 1
-                #trak = []
-                trak = generate_trak(seed, trak, trak_num, faves)
-            #hold in loop until a is pressed
-            if thumbyButton.buttonA.justPressed():
-                # trak is chosen
-                break
-            if thumbyButton.buttonB.justPressed():
-                # cancel
-                trak = []
-                break
-            if thumbyButton.buttonU.justPressed():
-                toggle_fave(trak)
-        else:
-            pass
+        if (not max_traks or trak_num < max_traks) \
+        and thumbyButton.buttonR.pressed():
+            if trak_num == max_traks-1:
+                # if we reach the end of max_traks
+                splash.end_faves_splash()
+            else:
+                trak_num += 1
+            #trak = []
+            trak = generate_trak(seed, trak, trak_num, faves, multilink)
+        if trak_num > 0 and thumbyButton.buttonL.pressed():
+            trak_num -= 1
+            #trak = []
+            trak = generate_trak(seed, trak, trak_num, faves, multilink)
+        #hold in loop until a is pressed
+        if thumbyButton.buttonA.justPressed():
+            # trak is chosen
+            break
+        if thumbyButton.buttonB.justPressed():
+            # cancel
+            trak = []
+            break
+        if thumbyButton.buttonU.justPressed():
+            toggle_fave(trak)
+                
         update_camera_preview(camera, trak)
         draw_trak_select(camera, trak)
     return trak

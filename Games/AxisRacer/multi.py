@@ -4,6 +4,14 @@ global GAME_NAME
 GAME_NAME = "AxisRacer"
 
 
+def send_null():
+    link.send(bytearray([0]))
+
+
+def recieve_null():
+    link.receieve()
+
+
 def send_handshake(player_num = 0):
     #msg = GAME_NAME + str(player_num)
     #data = msg.encode()
@@ -13,7 +21,9 @@ def send_handshake(player_num = 0):
 
 def receive_handshake():
     data = link.receive()
-    if data != None:
+    if data == None:
+        return 0
+    else:
         #msg = data[:-1]
         #their_player_num = int(data[-1])
         their_player_num = data[0]
@@ -24,4 +34,15 @@ def receive_handshake():
         # and if they are already player 1
         #     then we become player 2
         return their_player_num + 1
-    return 0
+
+def send_trak(trak_name):
+    data = bytearray([]) + trak_name.encode()
+    link.send(data)
+
+def receieve_trak():
+    data = link.receive()
+    if data == None:
+        return None
+    else:
+        # return code and trak name
+        return data[0], data[1:].decode()

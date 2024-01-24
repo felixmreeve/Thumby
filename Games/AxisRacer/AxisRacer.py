@@ -162,7 +162,7 @@ def named_players_menu(player_names = [], min_players = 2, title = "players:"):
             return player_names
 
 
-def trak_menu():
+def trak_menu(multilink = False):
     choice = 0
     while True:
         # reset previously selected trak to clear memory
@@ -177,12 +177,12 @@ def trak_menu():
         if choice == -1:
             break
         elif choice == 0:
-            trak = traklib.trak_select(selection=0, use_faves=False)
+            trak = traklib.trak_select(selection=0, use_faves=False, multilink=multilink)
         elif choice == 1:
             if save.num_faves() == 0:
                 splash.no_faves_splash()
             else:
-                trak = traklib.trak_select(selection=0, use_faves=True)
+                trak = traklib.trak_select(selection=0, use_faves=True, multilink=multilink)
         elif choice == 2:
             trak_name = inpt.keyboard()
             # add generated trak to faves
@@ -192,21 +192,10 @@ def trak_menu():
                     save.remove_fave(trak_name)
                 save.add_fave(trak_name)
                 choice = 1
-                trak = traklib.trak_select(selection=0, use_faves=True)
+                trak = traklib.trak_select(selection=0, use_faves=True, multilink=multilink)
         if trak:
             break
     return trak
-
-
-def waiting_for_trak():
-    disp.setFPS(30)
-    util.set_font(FONT_W, FONT_H)
-    while True:
-        # draw trak???
-        disp.fill(0)
-        disp.drawText("waiting for", 1, 1, 1)
-        disp.drawText("trak", 1, 8, 1)
-        disp.update()
 
 
 def handshake():
@@ -259,7 +248,11 @@ def two_player():
             else:
                 break
         elif player_num == 2:
-            waiting_for_trak()
+            trak = traklib.waiting_for_trak_select()
+            if trak:
+                traklib.race(trak, multiplayer = True)
+            else:
+                break
         else:
             raise RuntimeError(f"player_num is {player_num}")
 

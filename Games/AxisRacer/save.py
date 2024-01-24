@@ -68,6 +68,7 @@ def new_save():
     reset_seed()
     reset_faves()
 
+
 def init():
     if load_seed() == None:
         new_save()
