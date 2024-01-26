@@ -211,7 +211,6 @@ def handshake():
         if result:
             player_num = result
         if player_num:
-            disp.drawText("success!", 1, 16, 1)
             # send an additional handshake for half-duplex
             multi.send_handshake(player_num)
             multi.receive_handshake()
@@ -219,7 +218,6 @@ def handshake():
         disp.update()
         if thumbyButton.buttonB.justPressed():
             break
-        
     return player_num
 
 
@@ -238,11 +236,10 @@ def two_player():
     player_num = handshake()
     if not player_num:
         return
-
     while True:
         if player_num == 1:
             trak = None
-            trak = trak_menu()
+            trak = trak_menu(multilink = True)
             if trak:
                 traklib.race(trak, multiplayer = True)
             else:

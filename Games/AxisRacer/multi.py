@@ -3,13 +3,19 @@ from thumbyLink import link
 global GAME_NAME
 GAME_NAME = "AxisRacer"
 
+CODE_NULL     = const(0)
+CODE_PLAYER_1 = const(1)
+CODE_PLAYER_2 = const(2)
+CODE_CANCEL   = const(3)
+CODE_CONFIRM  = const(4)
+
 
 def send_null():
-    link.send(bytearray([0]))
+    link.send(bytearray([CODE_NULL]))
 
 
-def recieve_null():
-    link.receieve()
+def receive_null():
+    link.receive()
 
 
 def send_handshake(player_num = 0):
@@ -35,11 +41,13 @@ def receive_handshake():
         #     then we become player 2
         return their_player_num + 1
 
-def send_trak(trak_name):
-    data = bytearray([]) + trak_name.encode()
+def send_trak(trak_name, confirm=False):
+    # send code and trak name
+    code = CODE_CONFIRM if confirm else CODE_NULL
+    data = bytearray([code]) + trak_name.encode()
     link.send(data)
 
-def receieve_trak():
+def receive_trak():
     data = link.receive()
     if data == None:
         return None

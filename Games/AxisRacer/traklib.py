@@ -536,7 +536,7 @@ def generate_trak_from_name(trak_num, name, fave):
         TRAK_SEGMENT_LENGTH, preview_segment_length)
 
 
-def generate_trak(seed, old_trak, trak_num, from_faves, multilink):
+def generate_trak(seed, old_trak, trak_num, from_faves):
     # clean up old trak for memory reasons first!
     if old_trak:
         old_trak.clear()
@@ -560,10 +560,6 @@ def generate_trak(seed, old_trak, trak_num, from_faves, multilink):
         fave = False
 
     util.dprint(f"name {name}")
-    
-    if multilink:
-        multi.receieve_null()
-        multi.send_trak(name)
 
     return generate_trak_from_name(trak_num, name, fave)
 
@@ -602,23 +598,28 @@ def waiting_for_trak_select():
     global FONT_W, FONT_H
     disp.setFPS(30)
     util.set_font(FONT_W, FONT_H)
+    disp.fill(0)
     disp.drawText("waiting for", 0, 0, 1)
     disp.drawText("trak select", 0, FONT_H, 1)
+    disp.update()
     camera = get_camera()
     trak = {}
     while True:
         multi.send_null()
-        received = multi.receieve_trak()
+        received = multi.receive_trak()
         if received != None:
-            code, trak_name = receieved
-            # clear for memory reasons
-            trak.clear()
-            trak = generate_trak_from_name(-1, trak_name, None)
+            code, trak_name = received
+            if (received[0] != 0 and
+                trak_name != trak.get("name")):
+                # clear for memory reasons
+                trak.clear()
+                trak = generate_trak_from_name(-1, trak_name, False)
         if "condition" == "somehowbreak":
             break
         if trak:
             update_camera_preview(camera, trak)
             draw_trak_select(camera, trak)
+    raise RuntimeError("left end of waiting for trak select")
     return trak
 
 
@@ -638,7 +639,7 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
 
     util.dprint(f"max_traks is {max_traks}")
     trak_num = selection
-    trak = generate_trak(seed, None, trak_num, faves, multilink)
+    trak = generate_trak(seed, None, trak_num, faves)
     util.dprint("entering trak select loop")
     while True:
         if (not max_traks or trak_num < max_traks) \
@@ -649,22 +650,26 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
             else:
                 trak_num += 1
             #trak = []
-            trak = generate_trak(seed, trak, trak_num, faves, multilink)
+            trak = generate_trak(seed, trak, trak_num, faves)
         if trak_num > 0 and thumbyButton.buttonL.pressed():
             trak_num -= 1
             #trak = []
-            trak = generate_trak(seed, trak, trak_num, faves, multilink)
+            trak = generate_trak(seed, trak, trak_num, faves)
         #hold in loop until a is pressed
         if thumbyButton.buttonA.justPressed():
             # trak is chosen
             break
         if thumbyButton.buttonB.justPressed():
             # cancel
-            trak = []
+            trak = {}
             break
         if thumbyButton.buttonU.justPressed():
             toggle_fave(trak)
-                
+
+        if multilink:
+            multi.receive_null()
+            multi.send_trak(trak["name"], confirm=False)
+
         update_camera_preview(camera, trak)
         draw_trak_select(camera, trak)
     return trak
