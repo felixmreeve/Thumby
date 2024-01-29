@@ -76,7 +76,8 @@ def send_racer(seg, t):
     data = bytearray([
         CODE_RACER,
         seg,
-        0
+        # convert t to int
+        int(t*100)
     ])
     link.send(data)
 
@@ -86,6 +87,8 @@ def receive_racer():
     if data == None:
         return None
     elif data[0] == CODE_RACER:
+        # convert t to float
+        data[-1] /= 100
         return data
     else:
         # TODO: figure out logic for if we don't receive a racer
