@@ -271,12 +271,10 @@ def draw_racer(camera, racer, blocker = None):
     racer["sprite"].x, racer["sprite"].y = sprite_x, sprite_y
     if blocker:
         blocker.x, blocker.y = sprite_x, sprite_y
-        #blocker.x, blocker.y = view_transform(
-        #camera, racer["x"], racer["y"])
-        #blocker.x -= 3.5
-        #blocker.y -= 3.5
         disp.drawSprite(blocker)
-        #disp.drawRectangle(int(racer["sprite"].x+3.5-3), int(racer["sprite"].y+3.5-3), 5, 5, 1)
+    
+    print("seg", racer["seg"],"t", racer["t"])
+    print("xy:", racer["x"], racer["y"])
     disp.drawSprite(racer["sprite"])
 
 
@@ -605,21 +603,21 @@ def waiting_for_trak_select():
     camera = get_camera()
     trak = {}
     while True:
-        multi.send_null()
-        received = multi.receive_trak()
-        if received != None:
-            code, trak_name = received
-            if (received[0] != 0 and
-                trak_name != trak.get("name")):
-                # clear for memory reasons
-                trak.clear()
-                trak = generate_trak_from_name(-1, trak_name, False)
-        if "condition" == "somehowbreak":
+        received = None
+        while received == None:
+            multi.send_null()
+            received = multi.receive_trak()
+        code, trak_name = received
+        if code == multi.CODE_T_WAIT \
+        and trak_name != trak.get("name"):
+            # clear for memory reasons
+            trak.clear()
+            trak = generate_trak_from_name(-1, trak_name, False)
+        if code == multi.CODE_T_START:
             break
         if trak:
             update_camera_preview(camera, trak)
             draw_trak_select(camera, trak)
-    raise RuntimeError("left end of waiting for trak select")
     return trak
 
 
@@ -672,6 +670,8 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
 
         update_camera_preview(camera, trak)
         draw_trak_select(camera, trak)
+    multi.receive_null()
+    multi.send_trak(trak["name"], confirm=True)
     return trak
 
 
@@ -699,23 +699,34 @@ def update_camera(camera, racer):
     translate(camera, racer["x"], racer["y"])
 
 
-def update_race(camera, racer, trak):
-    update_racer(racer, trak)
-    update_camera(camera, racer)
+def update_multi(trak, player, opponent):
+    received = multi.receive_racer()
+    if received != None:
+        code, opponent["seg"], opponent["t"] = received
+    multi.send_racer(player["seg"], player["t"])
 
 
-def draw_race(camera, trak, racer, blocker, framerate):
+def update_race(camera, trak, player, opponent=None, multilink=False):
+    update_racer(player, trak)
+    update_camera(camera, player)
+    if multilink:
+        update_multi(trak, player, opponent)
+    if opponent:
+        update_racer_pos(opponent, trak["trak"])
+        update_racer_rot(opponent, trak["trak"])
+
+
+def draw_race(camera, trak, blocker, player, opponent=None):
     global RACE_SEGMENT_RANGE
     disp.fill(0)
-    draw_trak(camera, trak, segment=racer["seg"], segment_range=RACE_SEGMENT_RANGE)
-
-    draw_racer(camera, racer, blocker)
-    # framerate in corner
-    #disp.drawText(str(next(framerate)), 1, 1, 1)
+    draw_trak(camera, trak, segment=player["seg"], segment_range=RACE_SEGMENT_RANGE)
+    if opponent:
+        draw_racer(camera, opponent, blocker)
+    draw_racer(camera, player, blocker)
     disp.update()
 
 
-def race(trak, multiplayer = False):
+def race(trak, multilink = False):
     disp.setFPS(60)
     racer_sprite = sprite.Sprite(
         7, 7,
@@ -724,7 +735,9 @@ def race(trak, multiplayer = False):
         0, 0,
         0
     )
-    racer = get_racer(racer_sprite)
+    player = get_racer(racer_sprite)
+    opponent = get_racer(racer_sprite)
+    
     start_point = trak["trak"][:2]
     #racers = [get_racer() for i in range(2)]
     camera = get_camera()
@@ -736,12 +749,9 @@ def race(trak, multiplayer = False):
     )
     # start in trak preview position
     #update_camera_preview(camera, trak))
-    framerate = util.framerate()
     while True:
         #input()
         if thumbyButton.buttonB.justPressed():
             break
-        update_race(camera, racer, trak)
-        draw_race(camera, trak, racer, blocker, framerate)
-        fps = next(framerate)
-    
+        update_race(camera, trak, player, opponent, multilink)
+        draw_race(camera, trak, blocker, player, opponent)

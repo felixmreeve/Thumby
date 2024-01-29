@@ -227,27 +227,29 @@ def one_player():
         trak = trak_menu()
         if trak:
             choice = trak["num"]
-            traklib.race(trak, multiplayer = False)
+            traklib.race(trak, multilink = False)
         else:
             break
 
 
 def two_player():
+    global GAME_NAME
     player_num = handshake()
     if not player_num:
         return
+
     while True:
         if player_num == 1:
             trak = None
             trak = trak_menu(multilink = True)
             if trak:
-                traklib.race(trak, multiplayer = True)
+                traklib.race(trak, multilink = True)
             else:
                 break
         elif player_num == 2:
             trak = traklib.waiting_for_trak_select()
             if trak:
-                traklib.race(trak, multiplayer = True)
+                traklib.race(trak, multilink = True)
             else:
                 break
         else:
