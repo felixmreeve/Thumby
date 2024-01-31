@@ -38,13 +38,15 @@ TRAK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
 
 # how many trak segments to draw before/after center
 global RACE_SEGMENT_RANGE
-RACE_SEGMENT_RANGE = ((max(SCREEN_W, SCREEN_H)//2) // TRAK_SEGMENT_LENGTH) + 1 
+# there and back again
+RACE_SEGMENT_RANGE = ((max(SCREEN_W, SCREEN_H)) // TRAK_SEGMENT_LENGTH) + 1 
 
-global RACER_MAX_SPEED
-RACER_MAX_SPEED = 8
+global RACER_MAX_SPEED, RACER_MAX_MPH
+RACER_MAX_SPEED = 4
+RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
 global RACER_ACCELERATION, RACER_DECCELERATION
-RACER_ACCELERATION = 0.1
-RACER_DECCELERATION = 0.2
+RACER_ACCELERATION = 0.05
+RACER_DECCELERATION = 0.08
 
 
 def get_fave_heart():
@@ -146,9 +148,18 @@ def get_racer(sprite):
         "v": 0, # velocity
         "x": 0,
         "y": 0,
-        "sprite": sprite
+        "spr": sprite,
     }
     return racer
+
+
+def update_racer_seg_t(racer, points):
+    # move along segment by velocity
+    racer["t"] += racer["v"] / TRAK_SEGMENT_LENGTH
+    # move to next segment if t > 1
+    while racer["t"] >= 1:
+        racer["seg"] = (racer["seg"] + 1) % (len(points)//2)
+        racer["t"] -=1
 
 
 def update_racer_pos(racer, points):
@@ -174,7 +185,6 @@ def update_racer_rot(racer, points):
     # add pi/2 so up = 0 and % to change range 0<a<2pi
     angle = (math.atan2(vy, vx) + (math.pi/2)) % (2*math.pi)
     racer["r"] = angle
-    racer["sprite"].setFrame( get_rot_frame(racer["r"]) )
 
 
 def get_rot_frame(angle):
@@ -206,22 +216,23 @@ def prev_idx(i, trak):
     return (i-2) % len(trak)
 
 
-def draw_trak_ui(name, num, fave):
+def draw_trak_ui(name, num, fave, view_only=False):
     global FONT_W, FONT_H
     util.set_font(FONT_W, FONT_H)
     disp.drawText(
         name,
         0, SCREEN_H - FONT_H,
         1)
-    if num > 0:
-        disp.drawText("<", 0, (SCREEN_H - FONT_H) // 2, 1)
-    disp.drawText(
-        ">",
-        SCREEN_W - FONT_W,
-        (SCREEN_H - FONT_H) // 2,
-        1)
-    fave_heart = get_fave_heart()
-    fave_heart.setFrame(int(fave))
+    if not view_only:
+        if num > 0:
+            disp.drawText("<", 0, (SCREEN_H - FONT_H) // 2, 1)
+        disp.drawText(
+            ">",
+            SCREEN_W - FONT_W,
+            (SCREEN_H - FONT_H) // 2,
+            1)
+        fave_heart = get_fave_heart()
+        fave_heart.setFrame(int(fave))
     disp.drawSprite(fave_heart)
 
 
@@ -257,10 +268,6 @@ def draw_trak(camera, trak, preview = False, segment = None, segment_range = Non
 
 
 def draw_racer(camera, racer, blocker = None):
-    #a = int(racer["r"]*4*math.pi + 2*math.pi/16) / (4*math.pi)
-    #print(a)
-    #x_offset, y_offset = racer["x"] - 4*math.sin(a), racer["y"] + 4*math.cos(a)
-    #print(math.cos(racer["r"]), math.sin(racer["r"]), "\n")
     sprite_x, sprite_y = view_transform(
         camera, racer["x"], racer["y"])#x_offset, y_offset)
 
@@ -268,14 +275,14 @@ def draw_racer(camera, racer, blocker = None):
     sprite_x = sprite_x + offset[0] - 3.5
     sprite_y = sprite_y + offset[1] - 3.5
 
-    racer["sprite"].x, racer["sprite"].y = sprite_x, sprite_y
+    racer["spr"].x, racer["spr"].y = sprite_x, sprite_y
+    racer["spr"].setFrame( get_rot_frame(racer["r"]) )
+
     if blocker:
         blocker.x, blocker.y = sprite_x, sprite_y
         disp.drawSprite(blocker)
     
-    print("seg", racer["seg"],"t", racer["t"])
-    print("xy:", racer["x"], racer["y"])
-    disp.drawSprite(racer["sprite"])
+    disp.drawSprite(racer["spr"])
 
 
 def offset_points(points, offset):
@@ -585,10 +592,10 @@ def draw_start_line(x0, y0, x1, y1):
     disp.setPixel(x0+nx, y0+ny, 1)
 
 
-def draw_trak_select(camera, trak):
+def draw_trak_select(camera, trak, view_only=False):
     disp.fill(0) # Fill canvas to black
     draw_trak(camera, trak, preview = True)
-    draw_trak_ui(trak["name"], trak["num"], trak["fave"])
+    draw_trak_ui(trak["name"], trak["num"], trak["fave"], view_only=view_only)
     disp.update()
 
 
@@ -605,7 +612,8 @@ def waiting_for_trak_select():
     while True:
         received = None
         while received == None:
-            multi.send_null()
+            # don't send so that we receive every frame
+            #multi.send_null()
             received = multi.receive_trak()
         code, trak_name = received
         if code == multi.CODE_T_WAIT \
@@ -617,7 +625,7 @@ def waiting_for_trak_select():
             break
         if trak:
             update_camera_preview(camera, trak)
-            draw_trak_select(camera, trak)
+            draw_trak_select(camera, trak, view_only=True)
     return trak
 
 
@@ -665,32 +673,37 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
             toggle_fave(trak)
 
         if multilink:
-            multi.receive_null()
+            # no need to recieve from player 2
+            #multi.receive_null()
             multi.send_trak(trak["name"], confirm=False)
 
         update_camera_preview(camera, trak)
         draw_trak_select(camera, trak)
-    multi.receive_null()
-    multi.send_trak(trak["name"], confirm=True)
+    # no need to receive from player 2
+    #multi.receive_null()
+    if multilink:
+        success = False
+        if trak:
+            while not success:
+                success = multi.send_trak(trak["name"], confirm=True)
+        else:
+            while not success:
+                success = multi.send_trak_cancel()
     return trak
 
 
-def update_racer(racer, trak):
-    points = trak["trak"]
-
-    if racer["v"] < RACER_MAX_SPEED \
-    and thumbyButton.buttonA.pressed():
+def player_input(racer):
+    if thumbyButton.buttonA.pressed():
         racer["v"] += RACER_ACCELERATION
     else:
         racer["v"] -= RACER_DECCELERATION
-        racer["v"] = max(0, racer["v"])
-    # move along segment by velocity
-    racer["t"] += racer["v"] / TRAK_SEGMENT_LENGTH
-    # move to next segment if t > 1
-    while racer["t"] >= 1:
-        racer["seg"] = (racer["seg"] + 1) % (len(points)//2)
-        racer["t"] -=1
+    
+    racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
 
+
+def update_racer(racer, points, use_v=True):
+    if use_v:
+        update_racer_seg_t(racer, points)
     update_racer_pos(racer, points)
     update_racer_rot(racer, points)
 
@@ -699,21 +712,33 @@ def update_camera(camera, racer):
     translate(camera, racer["x"], racer["y"])
 
 
-def update_multi(trak, player, opponent):
+def update_multi(player, opponent):
     received = multi.receive_racer()
     if received != None:
-        code, opponent["seg"], opponent["t"] = received
-    multi.send_racer(player["seg"], player["t"])
+        code, opponent["seg"], opponent["t"], opponent["v"] = received
+    multi.send_racer(player["seg"], player["t"], player["v"])
+    return received
 
 
 def update_race(camera, trak, player, opponent=None, multilink=False):
-    update_racer(player, trak)
+    player_input(player)
+    update_racer(player, trak["trak"])
     update_camera(camera, player)
-    if multilink:
-        update_multi(trak, player, opponent)
-    if opponent:
-        update_racer_pos(opponent, trak["trak"])
-        update_racer_rot(opponent, trak["trak"])
+    if multilink and opponent:
+        received = update_multi(player, opponent)
+        # if we've received data, no need to update seg/t from v
+        # but if we didn't receieve any data, use v to estimate next seg/t
+        update_racer(opponent, trak["trak"], use_v = not received)
+    elif opponent: # cpu
+        update_racer(opponent, trak["trak"])
+
+
+def draw_hud(player, race_time):
+    util.set_font(util.MINI_FONT_W, util.MINI_FONT_H)
+    # draw speed
+    disp.drawFilledRectangle(0, 0, (util.MINI_FONT_W+1)*6, util.MINI_FONT_H+1, 0)
+    mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
+    disp.drawText(f"{mph:>3}mph", 0, 0, 1)
 
 
 def draw_race(camera, trak, blocker, player, opponent=None):
@@ -723,11 +748,13 @@ def draw_race(camera, trak, blocker, player, opponent=None):
     if opponent:
         draw_racer(camera, opponent, blocker)
     draw_racer(camera, player, blocker)
+    draw_hud(player, None)
     disp.update()
 
 
 def race(trak, multilink = False):
-    disp.setFPS(60)
+    # 40fps is a medium between speedy 60 and slow 30
+    disp.setFPS(40)
     racer_sprite = sprite.Sprite(
         7, 7,
         # BITMAP: width: 56, height: 7
@@ -737,9 +764,8 @@ def race(trak, multilink = False):
     )
     player = get_racer(racer_sprite)
     opponent = get_racer(racer_sprite)
-    
+
     start_point = trak["trak"][:2]
-    #racers = [get_racer() for i in range(2)]
     camera = get_camera()
     blocker = sprite.Sprite(
         7, 7,

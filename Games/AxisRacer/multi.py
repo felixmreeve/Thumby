@@ -3,6 +3,9 @@ from thumbyLink import link
 global GAME_NAME
 GAME_NAME = "AxisRacer"
 
+# step for converting between int/float
+STEP = 100
+
 CODE_NULL      = const(0)
 CODE_PLAYER_1  = const(1)
 CODE_PLAYER_2  = const(2)
@@ -13,11 +16,11 @@ CODE_RACER     = const(6)
 
 
 def send_null():
-    link.send(bytearray([CODE_NULL]))
+    return link.send(bytearray([CODE_NULL]))
 
 
 def receive_null():
-    link.receive()
+    return link.receive()
 
 
 def send_player_num(player_num):
@@ -30,8 +33,6 @@ def receive_player_num():
 
 
 def send_handshake(player_num = 0):
-    #msg = GAME_NAME + str(player_num)
-    #data = msg.encode()
     data = bytearray([player_num])
     return link.send(data)
 
@@ -57,7 +58,12 @@ def send_trak(trak_name, confirm=False):
     # send code and trak name
     code = CODE_T_START if confirm else CODE_T_WAIT
     data = bytearray([code]) + trak_name.encode()
-    link.send(data)
+    return link.send(data)
+
+
+def send_trak_cancel():
+    data = bytearray([CODE_T_CANCEL]) + "".encode()
+    return link.send(data)
 
 
 def receive_trak():
@@ -72,14 +78,16 @@ def receive_trak():
         return CODE_T_CANCEL, ""
 
 
-def send_racer(seg, t):
+def send_racer(seg, t, v):
     data = bytearray([
         CODE_RACER,
         seg,
         # convert t to int
-        int(t*100)
+        int(t*STEP),
+        # convert v to int
+        int(v*STEP)
     ])
-    link.send(data)
+    return link.send(data)
 
 
 def receive_racer():
@@ -87,9 +95,8 @@ def receive_racer():
     if data == None:
         return None
     elif data[0] == CODE_RACER:
-        # convert t to float
-        data[-1] /= 100
-        return data
+        # CODE_RACER, seg, t as float, v
+        return data[0], data[1], data[2]/STEP, data[3]/STEP
     else:
         # TODO: figure out logic for if we don't receive a racer
         return None
