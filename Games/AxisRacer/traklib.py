@@ -144,11 +144,14 @@ def get_racer(sprite):
     racer = {
         "seg": 0, # segment on track
         "t": 0, # t interpolation value along segment
-        "r": 0, # rotation
+        "r": 0, # rotation - "true" rotation to show
+        "_r": 0, # skidding rotation for derailing (visual only)
+        "rv": 0, # rotational velocity
         "v": 0, # velocity
-        "x": 0,
-        "y": 0,
-        "spr": sprite,
+        "x": 0, # x pos
+        "y": 0, # y pos
+        "on": True, # on trak / off railed
+        "spr": sprite, # sprite obj
     }
     return racer
 
@@ -163,28 +166,49 @@ def update_racer_seg_t(racer, points):
 
 
 def update_racer_pos(racer, points):
-    t = racer["t"]
-    i0 = racer["seg"]*2 # double since points are x, y
-    i1 = next_idx(i0, points)
-    # get start/end of current segment
-    x0, y0 = points[i0], points[i0+1]
-    x1, y1 = points[i1], points[i1+1]
-    # interpolate along the segment
-    racer["x"] = (1-t)*x0 + t*x1
-    racer["y"] = (1-t)*y0 + t*y1
+    if racer["on"]:
+        t = racer["t"]
+        i0 = racer["seg"]*2 # double since points are x, y
+        i1 = next_idx(i0, points)
+        # get start/end of current segment
+        x0, y0 = points[i0], points[i0+1]
+        x1, y1 = points[i1], points[i1+1]
+        # interpolate along the segment
+        racer["x"] = (1-t)*x0 + t*x1
+        racer["y"] = (1-t)*y0 + t*y1
+    else: # derail
+        racer["x"] += racer["v"] * math.sin(racer["r"])
+        racer["y"] -= racer["v"] * math.cos(racer["r"])
 
 
 def update_racer_rot(racer, points):
-    i0 = racer["seg"]*2  # double since points are x, y
-    i1 = next_idx(i0, points)
-    x0, y0 = points[i0], points[i0+1]
-    x1, y1 = points[i1], points[i1+1]
-    vx = x1-x0
-    vy = y1-y0 # negative so that 0 is up
-    #vx, vy = normalise(vx, vy)
-    # add pi/2 so up = 0 and % to change range 0<a<2pi
-    angle = (math.atan2(vy, vx) + (math.pi/2)) % (2*math.pi)
-    racer["r"] = angle
+    if racer["on"]:
+        i0 = racer["seg"]*2  # double since points are x, y
+        i1 = next_idx(i0, points)
+        x0, y0 = points[i0], points[i0+1]
+        x1, y1 = points[i1], points[i1+1]
+        vx = x1-x0
+        vy = y1-y0 # negative so that 0 is up
+        #vx, vy = normalise(vx, vy)
+        # add pi/2 so up = 0 and % to change range 0<a<2pi
+        angle = (math.atan2(vy, vx) + (math.pi/2)) % (2*math.pi)
+        
+        if angle != racer["r"]:
+            # calculate rotate change
+            racer["rv"] = (angle - racer["r"])
+            if racer["rv"] > math.pi:
+                racer["rv"] = -2*math.pi + racer["rv"]
+            elif racer["rv"] < -math.pi:
+                racer["rv"] = 2*math.pi + racer["rv"]
+        
+            racer["r"] = angle
+            racer["_r"] = angle
+
+    else: # derailed
+        if racer["rv"] < 0:
+            racer["_r"] -= math.pi / 8
+        else:
+            racer["_r"] += math.pi / 8
 
 
 def get_rot_frame(angle):
@@ -270,13 +294,13 @@ def draw_trak(camera, trak, preview = False, segment = None, segment_range = Non
 def draw_racer(camera, racer, blocker = None):
     sprite_x, sprite_y = view_transform(
         camera, racer["x"], racer["y"])#x_offset, y_offset)
-
+    # using r or _r?
     offset = get_rot_frame_offset(racer["r"])
     sprite_x = sprite_x + offset[0] - 3.5
     sprite_y = sprite_y + offset[1] - 3.5
 
     racer["spr"].x, racer["spr"].y = sprite_x, sprite_y
-    racer["spr"].setFrame( get_rot_frame(racer["r"]) )
+    racer["spr"].setFrame( get_rot_frame(racer["_r"]) )
 
     if blocker:
         blocker.x, blocker.y = sprite_x, sprite_y
@@ -302,7 +326,7 @@ def generate_key_points(width, height, n_key_points):
         # point angle in radians
         a = i/n_key_points * 2 * math.pi
         vx = math.sin(a)
-        vy = math.cos(a)
+        vy = -math.cos(a)
         dist = random.uniform(0.1, 1.0)
         x = cx + vx * dist * width/2
         y = cy + vy * dist * height/2
@@ -693,16 +717,22 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
 
 
 def player_input(racer):
-    if thumbyButton.buttonA.pressed():
-        racer["v"] += RACER_ACCELERATION
-    else:
-        racer["v"] -= RACER_DECCELERATION
+    if racer["on"]:
+        if thumbyButton.buttonA.pressed():
+            racer["v"] += RACER_ACCELERATION
+        else:
+            racer["v"] -= RACER_DECCELERATION
+    
+    if thumbyButton.buttonU.justPressed():
+        racer["on"] = False
+    if thumbyButton.buttonD.justPressed():
+        racer["on"] = True
     
     racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
 
 
 def update_racer(racer, points, use_v=True):
-    if use_v:
+    if use_v and racer["on"]:
         update_racer_seg_t(racer, points)
     update_racer_pos(racer, points)
     update_racer_rot(racer, points)
@@ -734,11 +764,13 @@ def update_race(camera, trak, player, opponent=None, multilink=False):
 
 
 def draw_hud(player, race_time):
-    util.set_font(util.MINI_FONT_W, util.MINI_FONT_H)
+    util.set_font(MINI_FONT_W, MINI_FONT_H)
     # draw speed
-    disp.drawFilledRectangle(0, 0, (util.MINI_FONT_W+1)*6, util.MINI_FONT_H+1, 0)
+    disp.drawFilledRectangle(0, 0, (MINI_FONT_W+1)*6, MINI_FONT_H+1, 0)
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
     disp.drawText(f"{mph:>3}mph", 0, 0, 1)
+    disp.drawText(f"{player['r']}", 0, MINI_FONT_H+1, 1)
+    disp.drawText(f"{player['rv']}", 0, 2*(MINI_FONT_H+1), 1)
 
 
 def draw_race(camera, trak, blocker, player, opponent=None):
