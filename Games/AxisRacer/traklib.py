@@ -41,9 +41,10 @@ global RACE_SEGMENT_RANGE
 # there and back again
 RACE_SEGMENT_RANGE = ((max(SCREEN_W, SCREEN_H)) // TRAK_SEGMENT_LENGTH) + 1 
 
-global RACER_MAX_SPEED, RACER_MAX_MPH
+global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE
 RACER_MAX_SPEED = 4
 RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
+RACER_MAX_FORCE = RACER_MAX_SPEED * 0.5
 global RACER_ACCELERATION, RACER_DECCELERATION
 RACER_ACCELERATION = 0.05
 RACER_DECCELERATION = 0.08
@@ -192,23 +193,33 @@ def update_racer_rot(racer, points):
         #vx, vy = normalise(vx, vy)
         # add pi/2 so up = 0 and % to change range 0<a<2pi
         angle = (math.atan2(vy, vx) + (math.pi/2)) % (2*math.pi)
-        
+        # if rotation has changed
         if angle != racer["r"]:
-            # calculate rotate change
-            racer["rv"] = (angle - racer["r"])
-            if racer["rv"] > math.pi:
-                racer["rv"] = -2*math.pi + racer["rv"]
-            elif racer["rv"] < -math.pi:
-                racer["rv"] = 2*math.pi + racer["rv"]
-        
-            racer["r"] = angle
-            racer["_r"] = angle
-
+            if racer["v"] == 0:
+                racer["rv"] = 0
+            else:
+                # calculate rotate change
+                racer["rv"] = (angle - racer["r"])
+                if racer["rv"] > math.pi:
+                    racer["rv"] = -2*math.pi + racer["rv"]
+                elif racer["rv"] < -math.pi:
+                    racer["rv"] = 2*math.pi + racer["rv"]
+    
+                racer["r"] = angle
+                racer["_r"] = angle
     else: # derailed
         if racer["rv"] < 0:
             racer["_r"] -= math.pi / 8
         else:
             racer["_r"] += math.pi / 8
+        
+
+
+def update_racer_derail(racer):
+    global RACER_MAX_FORCE
+    racer_force = abs(racer["v"] * racer["rv"])
+    if racer_force > RACER_MAX_FORCE:
+        racer["on"] = False
 
 
 def get_rot_frame(angle):
@@ -716,7 +727,8 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
     return trak
 
 
-def player_input(racer):
+def player_input(racer, points):
+    global RACER_MAX_FORCE
     if racer["on"]:
         if thumbyButton.buttonA.pressed():
             racer["v"] += RACER_ACCELERATION
@@ -727,15 +739,25 @@ def player_input(racer):
         racer["on"] = False
     if thumbyButton.buttonD.justPressed():
         racer["on"] = True
+        racer["v"] = 0
+        racer["_r"] = racer["r"] # reset visual rotation
+        update_racer_rot(racer, points)
     
+    if thumbyButton.buttonL.justPressed():
+        RACER_MAX_FORCE -= 0.1
+    if thumbyButton.buttonD.justPressed():
+        RACER_MAX_FORCE += 0.1
+
     racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
 
 
-def update_racer(racer, points, use_v=True):
+def update_racer(racer, points, use_v=True, check_derail=False):
     if use_v and racer["on"]:
         update_racer_seg_t(racer, points)
     update_racer_pos(racer, points)
     update_racer_rot(racer, points)
+    if check_derail:
+        update_racer_derail(racer)
 
 
 def update_camera(camera, racer):
@@ -751,8 +773,8 @@ def update_multi(player, opponent):
 
 
 def update_race(camera, trak, player, opponent=None, multilink=False):
-    player_input(player)
-    update_racer(player, trak["trak"])
+    player_input(player, trak["trak"])
+    update_racer(player, trak["trak"], check_derail=True)
     update_camera(camera, player)
     if multilink and opponent:
         received = update_multi(player, opponent)
@@ -764,6 +786,7 @@ def update_race(camera, trak, player, opponent=None, multilink=False):
 
 
 def draw_hud(player, race_time):
+    global RACER_MAX_FORCE
     util.set_font(MINI_FONT_W, MINI_FONT_H)
     # draw speed
     disp.drawFilledRectangle(0, 0, (MINI_FONT_W+1)*6, MINI_FONT_H+1, 0)
@@ -771,6 +794,7 @@ def draw_hud(player, race_time):
     disp.drawText(f"{mph:>3}mph", 0, 0, 1)
     disp.drawText(f"{player['r']}", 0, MINI_FONT_H+1, 1)
     disp.drawText(f"{player['rv']}", 0, 2*(MINI_FONT_H+1), 1)
+    disp.drawText(f"{RACER_MAX_FORCE}", 0, 5*(MINI_FONT_H+1), 1)
 
 
 def draw_race(camera, trak, blocker, player, opponent=None):
