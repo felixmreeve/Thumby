@@ -49,17 +49,6 @@ except ImportError:
 else:
     EMULATOR = True
 
-# ********** master debug flag **********
-global DEBUG_MODE
-DEBUG_MODE = True
-# ***************************************
-# extra debug flags
-global DEBUG_ON_DEVICE, DEBUG_FIXED_SEED
-DEBUG_ON_DEVICE = False
-DEBUG_FIXED_SEED = False
-if not EMULATOR:
-    DEBUG_MODE = DEBUG_ON_DEVICE
-
 
 def menu(*choices, selection=0, title=""):
     disp.setFPS(30)
@@ -293,7 +282,7 @@ def share_times():
 
 
 def demo_mode():
-    raise Exception("demo mode not")
+    raise Exception("demo mode not implemented")
 
 
 def reroll_traks():

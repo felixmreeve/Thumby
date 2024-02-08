@@ -41,13 +41,16 @@ global RACE_SEGMENT_RANGE
 # there and back again
 RACE_SEGMENT_RANGE = ((max(SCREEN_W, SCREEN_H)) // TRAK_SEGMENT_LENGTH) + 1 
 
-global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE
+global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG
 RACER_MAX_SPEED = 4
 RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
-RACER_MAX_FORCE = RACER_MAX_SPEED * 0.5
-global RACER_ACCELERATION, RACER_DECCELERATION
+RACER_MAX_FORCE = RACER_MAX_SPEED * 0.1
+RACER_MAX_DMG = 10
+
+global RACER_ACCELERATION, RACER_DECCELERATION, RACER_DMG_REDUCTION
 RACER_ACCELERATION = 0.05
 RACER_DECCELERATION = 0.08
+RACER_DMG_REDUCTION = 0.1
 
 
 def get_fave_heart():
@@ -141,19 +144,23 @@ def get_camera():
     return camera
 
 
-def get_racer(sprite):
+def get_racer(sprite, points):
     racer = {
         "seg": 0, # segment on track
         "t": 0, # t interpolation value along segment
         "r": 0, # rotation - "true" rotation to show
         "_r": 0, # skidding rotation for derailing (visual only)
-        "rv": 0, # rotational velocity
+        "rv": [0, 0, 0], # rotational velocity
+        "f": 0, # normal force for derailing (via doing dmg)
+        "dmg": 0, # if this gets too high - derail
         "v": 0, # velocity
         "x": 0, # x pos
         "y": 0, # y pos
         "on": True, # on trak / off railed
         "spr": sprite, # sprite obj
     }
+    update_racer_rot(racer, points)
+
     return racer
 
 
@@ -182,10 +189,12 @@ def update_racer_pos(racer, points):
         racer["y"] -= racer["v"] * math.cos(racer["r"])
 
 
-def update_racer_rot(racer, points):
+def update_racer_rot(racer, points, calculate_rv=True):
     if racer["on"]:
-        i0 = racer["seg"]*2  # double since points are x, y
-        i1 = next_idx(i0, points)
+        # TODO: use next segment??
+        i = racer["seg"]*2  # double since points are x, y
+        i0 = i #next_idx(i, points) # we actually check the next segment
+        i1 = next_idx(i0, points) 
         x0, y0 = points[i0], points[i0+1]
         x1, y1 = points[i1], points[i1+1]
         vx = x1-x0
@@ -196,30 +205,47 @@ def update_racer_rot(racer, points):
         # if rotation has changed
         if angle != racer["r"]:
             if racer["v"] == 0:
-                racer["rv"] = 0
-            else:
+                racer["rv"] = [0, 0, 0]
+            elif calculate_rv:
                 # calculate rotate change
-                racer["rv"] = (angle - racer["r"])
-                if racer["rv"] > math.pi:
-                    racer["rv"] = -2*math.pi + racer["rv"]
-                elif racer["rv"] < -math.pi:
-                    racer["rv"] = 2*math.pi + racer["rv"]
-    
-                racer["r"] = angle
-                racer["_r"] = angle
+                rv = (angle - racer["r"])
+                if rv > math.pi:
+                    rv = -2*math.pi + rv
+                elif rv < -math.pi:
+                    rv = 2*math.pi + rv
+                # use sqrt to remap a bit to change the 
+                rv = math.copysign(math.sqrt(abs(rv)), rv)
+                racer["rv"] = (rv,) # racer["rv"][0], racer["rv"][1]
+                racer["f"] = sum(racer["rv"])/len(racer["rv"])
+            racer["r"] = angle
+            racer["_r"] = angle
     else: # derailed
-        if racer["rv"] < 0:
+        # check direction of rotational velocity
+        if racer["rv"][-1] < 0:
+            # rotate by 1 sprite every 2 frames
             racer["_r"] -= math.pi / 8
         else:
             racer["_r"] += math.pi / 8
-        
 
 
 def update_racer_derail(racer):
     global RACER_MAX_FORCE
-    racer_force = abs(racer["v"] * racer["rv"])
+    racer_force = racer["f"] * racer["v"]
     if racer_force > RACER_MAX_FORCE:
         racer["on"] = False
+
+
+def derail(racer):
+    racer["off"]
+
+
+def rerail(racer, points):
+    racer["on"] = True
+    racer["seg"] = (racer["seg"] + 1) % (len(points)//2)
+    racer["t"] = 0
+    racer["v"] = 0
+    racer["_r"] = racer["r"] # reset visual rotation
+    update_racer_rot(racer, points)
 
 
 def get_rot_frame(angle):
@@ -272,7 +298,6 @@ def draw_trak_ui(name, num, fave, view_only=False):
 
 
 def draw_trak(camera, trak, preview = False, segment = None, segment_range = None):
-    global FONT_WIDTH, FONT_HEIGHT
     if preview:
         points = trak["preview"]
     else:
@@ -304,7 +329,7 @@ def draw_trak(camera, trak, preview = False, segment = None, segment_range = Non
 
 def draw_racer(camera, racer, blocker = None):
     sprite_x, sprite_y = view_transform(
-        camera, racer["x"], racer["y"])#x_offset, y_offset)
+        camera, racer["x"], racer["y"])
     # using r or _r?
     offset = get_rot_frame_offset(racer["r"])
     sprite_x = sprite_x + offset[0] - 3.5
@@ -316,7 +341,7 @@ def draw_racer(camera, racer, blocker = None):
     if blocker:
         blocker.x, blocker.y = sprite_x, sprite_y
         disp.drawSprite(blocker)
-    
+
     disp.drawSprite(racer["spr"])
 
 
@@ -736,16 +761,13 @@ def player_input(racer, points):
             racer["v"] -= RACER_DECCELERATION
     
     if thumbyButton.buttonU.justPressed():
-        racer["on"] = False
+        derail(racer)
     if thumbyButton.buttonD.justPressed():
-        racer["on"] = True
-        racer["v"] = 0
-        racer["_r"] = racer["r"] # reset visual rotation
-        update_racer_rot(racer, points)
+        rerail(racer, points)
     
     if thumbyButton.buttonL.justPressed():
         RACER_MAX_FORCE -= 0.1
-    if thumbyButton.buttonD.justPressed():
+    if thumbyButton.buttonR.justPressed():
         RACER_MAX_FORCE += 0.1
 
     racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
@@ -773,7 +795,9 @@ def update_multi(player, opponent):
 
 
 def update_race(camera, trak, player, opponent=None, multilink=False):
+    # process input
     player_input(player, trak["trak"])
+
     update_racer(player, trak["trak"], check_derail=True)
     update_camera(camera, player)
     if multilink and opponent:
@@ -785,6 +809,16 @@ def update_race(camera, trak, player, opponent=None, multilink=False):
         update_racer(opponent, trak["trak"])
 
 
+# screen length vertical loading bar
+def draw_loading_bar(value, total, x):
+    disp.drawRectangle(x, 0, 5, SCREEN_H, 1)
+    disp.drawFilledRectangle(
+        x, 0,
+        5, int(value/total * SCREEN_H), 
+        1
+    )
+
+
 def draw_hud(player, race_time):
     global RACER_MAX_FORCE
     util.set_font(MINI_FONT_W, MINI_FONT_H)
@@ -792,9 +826,27 @@ def draw_hud(player, race_time):
     disp.drawFilledRectangle(0, 0, (MINI_FONT_W+1)*6, MINI_FONT_H+1, 0)
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
     disp.drawText(f"{mph:>3}mph", 0, 0, 1)
-    disp.drawText(f"{player['r']}", 0, MINI_FONT_H+1, 1)
-    disp.drawText(f"{player['rv']}", 0, 2*(MINI_FONT_H+1), 1)
+    #disp.drawText(f"{player["f"]}", 0, MINI_FONT_H+1, 1)
     disp.drawText(f"{RACER_MAX_FORCE}", 0, 5*(MINI_FONT_H+1), 1)
+
+    draw_loading_bar(abs(player["f"])*player["v"], RACER_MAX_FORCE, SCREEN_W-5)
+    draw_loading_bar(player["dmg"], RACER_MAX_DMG, SCREEN_W-10)
+
+
+def draw_debug(camera, trak, player):
+    points = trak["trak"]
+
+    px, py = view_transform(camera, player["x"], player["y"])
+    i0 = player["seg"] * 2
+    i1 = next_idx(i0, points)
+    x0, y0 = points[i0], points[i0+1]
+    x1, y1 = points[i1], points[i1+1]
+    nx, ny = get_normal_in(x0, y0, x1, y1)
+    # end point is based on player force
+    nx = int(nx * (player["f"]/RACER_MAX_FORCE) * 20)
+    ny = int(ny * (player["f"]/RACER_MAX_FORCE) * 20)
+
+    disp.drawLine(px, py, px+nx, py+ny, 1)
 
 
 def draw_race(camera, trak, blocker, player, opponent=None):
@@ -803,6 +855,8 @@ def draw_race(camera, trak, blocker, player, opponent=None):
     draw_trak(camera, trak, segment=player["seg"], segment_range=RACE_SEGMENT_RANGE)
     if opponent:
         draw_racer(camera, opponent, blocker)
+    if util.DEBUG_MODE:
+        draw_debug(camera, trak, player)
     draw_racer(camera, player, blocker)
     draw_hud(player, None)
     disp.update()
@@ -818,10 +872,11 @@ def race(trak, multilink = False):
         0, 0,
         0
     )
-    player = get_racer(racer_sprite)
-    opponent = get_racer(racer_sprite)
+    points = trak["trak"]
+    player = get_racer(racer_sprite, points)
+    opponent = get_racer(racer_sprite, points)
 
-    start_point = trak["trak"][:2]
+    start_point = points[:2]
     camera = get_camera()
     blocker = sprite.Sprite(
         7, 7,
