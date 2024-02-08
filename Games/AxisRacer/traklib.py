@@ -150,8 +150,7 @@ def get_racer(sprite, points):
         "t": 0, # t interpolation value along segment
         "r": 0, # rotation - "true" rotation to show
         "_r": 0, # skidding rotation for derailing (visual only)
-        "rv": [0, 0, 0], # rotational velocity
-        "f": 0, # normal force for derailing (via doing dmg)
+        "rv": 0, # rotational velocity, used as normal force for derailing (via doing dmg)
         "dmg": 0, # if this gets too high - derail
         "v": 0, # velocity
         "x": 0, # x pos
@@ -205,7 +204,7 @@ def update_racer_rot(racer, points, calculate_rv=True):
         # if rotation has changed
         if angle != racer["r"]:
             if racer["v"] == 0:
-                racer["rv"] = [0, 0, 0]
+                racer["rv"] = 0
             elif calculate_rv:
                 # calculate rotate change
                 rv = (angle - racer["r"])
@@ -213,26 +212,31 @@ def update_racer_rot(racer, points, calculate_rv=True):
                     rv = -2*math.pi + rv
                 elif rv < -math.pi:
                     rv = 2*math.pi + rv
-                # use sqrt to remap a bit to change the 
-                rv = math.copysign(math.sqrt(abs(rv)), rv)
-                racer["rv"] = (rv,) # racer["rv"][0], racer["rv"][1]
-                racer["f"] = sum(racer["rv"])/len(racer["rv"])
+                # use sqrt to remap a bit to change the weight
+                #rv = math.copysign(math.sqrt(abs(rv)), rv)
+                racer["rv"] = rv # racer["rv"][0], racer["rv"][1]
             racer["r"] = angle
             racer["_r"] = angle
     else: # derailed
         # check direction of rotational velocity
-        if racer["rv"][-1] < 0:
+        if racer["rv"] < 0:
             # rotate by 1 sprite every 2 frames
             racer["_r"] -= math.pi / 8
         else:
             racer["_r"] += math.pi / 8
 
 
+def update_racer_dmg(racer):
+    racer["dmg"] += get_racer_force(racer) - RACER_MAX_FORCE
+    racer["dmg"] = max(0, racer["dmg"])
+
+
 def update_racer_derail(racer):
     global RACER_MAX_FORCE
-    racer_force = racer["f"] * racer["v"]
+    racer_force = get_racer_force(racer)
+    racer_force = 0
     if racer_force > RACER_MAX_FORCE:
-        racer["on"] = False
+        derail(racer)
 
 
 def derail(racer):
@@ -245,7 +249,12 @@ def rerail(racer, points):
     racer["t"] = 0
     racer["v"] = 0
     racer["_r"] = racer["r"] # reset visual rotation
+    racer["rv"] = 0
     update_racer_rot(racer, points)
+
+
+def get_racer_force(racer):
+    return abs(racer["rv"] * racer["v"])
 
 
 def get_rot_frame(angle):
@@ -778,6 +787,8 @@ def update_racer(racer, points, use_v=True, check_derail=False):
         update_racer_seg_t(racer, points)
     update_racer_pos(racer, points)
     update_racer_rot(racer, points)
+    update_racer_dmg(racer)
+
     if check_derail:
         update_racer_derail(racer)
 
@@ -826,10 +837,10 @@ def draw_hud(player, race_time):
     disp.drawFilledRectangle(0, 0, (MINI_FONT_W+1)*6, MINI_FONT_H+1, 0)
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
     disp.drawText(f"{mph:>3}mph", 0, 0, 1)
-    #disp.drawText(f"{player["f"]}", 0, MINI_FONT_H+1, 1)
+    #disp.drawText(f"{player["rv"]}", 0, MINI_FONT_H+1, 1)
     disp.drawText(f"{RACER_MAX_FORCE}", 0, 5*(MINI_FONT_H+1), 1)
 
-    draw_loading_bar(abs(player["f"])*player["v"], RACER_MAX_FORCE, SCREEN_W-5)
+    draw_loading_bar(get_racer_force(player), RACER_MAX_FORCE, SCREEN_W-5)
     draw_loading_bar(player["dmg"], RACER_MAX_DMG, SCREEN_W-10)
 
 
@@ -843,8 +854,8 @@ def draw_debug(camera, trak, player):
     x1, y1 = points[i1], points[i1+1]
     nx, ny = get_normal_in(x0, y0, x1, y1)
     # end point is based on player force
-    nx = int(nx * (player["f"]/RACER_MAX_FORCE) * 20)
-    ny = int(ny * (player["f"]/RACER_MAX_FORCE) * 20)
+    nx = int(nx * (player["rv"]/RACER_MAX_FORCE) * 20)
+    ny = int(ny * (player["rv"]/RACER_MAX_FORCE) * 20)
 
     disp.drawLine(px, py, px+nx, py+ny, 1)
 
