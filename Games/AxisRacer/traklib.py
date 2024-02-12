@@ -195,18 +195,27 @@ def update_racer_pos(racer, points):
         racer["y"] -= racer["v"] * math.cos(racer["r"])
 
 
+def get_seg_angle(i0, points):
+    i1 = next_idx(i0, points) 
+    x0, y0 = points[i0], points[i0+1]
+    x1, y1 = points[i1], points[i1+1]
+    vx = x1-x0
+    vy = y1-y0 # negative so that 0 is up
+    #vx, vy = normalise(vx, vy)
+    # add pi/2 so up = 0 and % to change range 0<a<2pi
+    angle = (math.atan2(vy, vx) + (math.pi/2)) % (2*math.pi)
+    return angle
+
+
 def update_racer_rot(racer, points, calculate_rv=True):
     if racer["on"]:
         i = racer["seg"]*2  # double since points are x, y
-        i0 = next_idx(i, points) # we actually check the next segment
-        i1 = next_idx(i0, points) 
-        x0, y0 = points[i0], points[i0+1]
-        x1, y1 = points[i1], points[i1+1]
-        vx = x1-x0
-        vy = y1-y0 # negative so that 0 is up
-        #vx, vy = normalise(vx, vy)
-        # add pi/2 so up = 0 and % to change range 0<a<2pi
-        angle = (math.atan2(vy, vx) + (math.pi/2)) % (2*math.pi)
+        # we actually check 2 segments ahead to look like drifting
+        # and encourage slowing down before corners
+        # and speeding up coming out of corners
+        i = next_idx(i, points)
+        i = next_idx(i, points)
+        angle = get_seg_angle(i, points)
         # if rotation has changed
         if angle != racer["r"]:
             if racer["v"] == 0:
@@ -243,17 +252,18 @@ def update_racer_derail(racer, points):
             racer["dmg"] -= RACER_MAX_SPEED - racer["v"]
         racer["dmg"] = max(0, racer["dmg"])
         if racer["dmg"] > RACER_MAX_DMG:
-            derail(racer)
+            derail(racer, points)
     else:
         racer["t"] += 1/RACER_RERAIL_FRAMES
         if racer["t"] >= 1:
             rerail(racer, points)
 
 
-def derail(racer):
+def derail(racer, points):
     racer["on"] = False
     racer["t"] = 0 # we'll use t to track how long before it's back on
-
+    i = racer["seg"]*2  # double since points are x, y
+    racer["r"] = get_seg_angle(i, points)
 
 def rerail(racer, points):
     racer["on"] = True
