@@ -32,6 +32,10 @@ global BIG_FONT_W, BIG_FONT_H
 BIG_FONT_W = const(8)
 BIG_FONT_H = const(8)
 
+global LOADING_BAR_SIZE, LOADING_BAR_LENGTH
+LOADING_BAR_SIZE = 5
+LOADING_BAR_LENGTH = 20
+
 global TRAK_PREVIEW_W, TRAK_PREVIEW_H
 TRAK_PREVIEW_W = const(SCREEN_W - (FONT_W+1)*2)
 TRAK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
@@ -44,13 +48,12 @@ RACE_SEGMENT_RANGE = ((max(SCREEN_W, SCREEN_H)) // TRAK_SEGMENT_LENGTH) + 1
 global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG
 RACER_MAX_SPEED = 4
 RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
-RACER_MAX_FORCE = RACER_MAX_SPEED * 0.1
+RACER_MAX_FORCE = RACER_MAX_SPEED * 0.05
 RACER_MAX_DMG = 10
 
-global RACER_ACCELERATION, RACER_DECCELERATION, RACER_DMG_REDUCTION
+global RACER_ACCELERATION, RACER_DECCELERATION
 RACER_ACCELERATION = 0.05
 RACER_DECCELERATION = 0.08
-RACER_DMG_REDUCTION = 0.1
 
 
 def get_fave_heart():
@@ -155,7 +158,7 @@ def get_racer(sprite, points):
         "v": 0, # velocity
         "x": 0, # x pos
         "y": 0, # y pos
-        "on": True, # on trak / off railed
+        "on": True, # on=ontrak / off=derailed
         "spr": sprite, # sprite obj
     }
     update_racer_rot(racer, points)
@@ -227,20 +230,19 @@ def update_racer_rot(racer, points, calculate_rv=True):
 
 
 def update_racer_dmg(racer):
-    racer["dmg"] += get_racer_force(racer) - RACER_MAX_FORCE
-    racer["dmg"] = max(0, racer["dmg"])
-
-
-def update_racer_derail(racer):
     global RACER_MAX_FORCE
-    racer_force = get_racer_force(racer)
-    racer_force = 0
-    if racer_force > RACER_MAX_FORCE:
-        derail(racer)
+    force = get_racer_force(racer)
+    if force > RACER_MAX_FORCE:
+        racer["dmg"] += force - RACER_MAX_FORCE
+    else:
+        racer["dmg"] -= RACER_MAX_SPEED - racer["v"]
+    racer["dmg"] = max(0, racer["dmg"])
+    if racer["dmg"] > RACER_MAX_DMG:
+        derail()
 
 
 def derail(racer):
-    racer["off"]
+    racer["on"] = False
 
 
 def rerail(racer, points):
@@ -250,11 +252,13 @@ def rerail(racer, points):
     racer["v"] = 0
     racer["_r"] = racer["r"] # reset visual rotation
     racer["rv"] = 0
+    racer["dmg"] = 0
     update_racer_rot(racer, points)
 
 
 def get_racer_force(racer):
-    return abs(racer["rv"] * racer["v"])
+    # rv**2 * v
+    return abs(racer["rv"] * racer["rv"] * racer["v"])
 
 
 def get_rot_frame(angle):
@@ -681,7 +685,7 @@ def waiting_for_trak_select():
     while True:
         received = None
         while received == None:
-            # don't send so that we receive every frame
+            # no need to send anything
             #multi.send_null()
             received = multi.receive_trak()
         code, trak_name = received
@@ -775,22 +779,21 @@ def player_input(racer, points):
         rerail(racer, points)
     
     if thumbyButton.buttonL.justPressed():
-        RACER_MAX_FORCE -= 0.1
+        RACER_MAX_FORCE -= 0.02
     if thumbyButton.buttonR.justPressed():
-        RACER_MAX_FORCE += 0.1
+        RACER_MAX_FORCE += 0.02
 
     racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
 
 
-def update_racer(racer, points, use_v=True, check_derail=False):
+def update_racer(racer, points, use_v=True, check_dmg=False):
     if use_v and racer["on"]:
         update_racer_seg_t(racer, points)
     update_racer_pos(racer, points)
     update_racer_rot(racer, points)
-    update_racer_dmg(racer)
 
-    if check_derail:
-        update_racer_derail(racer)
+    if check_dmg:
+        update_racer_dmg(racer)
 
 
 def update_camera(camera, racer):
@@ -809,7 +812,7 @@ def update_race(camera, trak, player, opponent=None, multilink=False):
     # process input
     player_input(player, trak["trak"])
 
-    update_racer(player, trak["trak"], check_derail=True)
+    update_racer(player, trak["trak"], check_dmg=True)
     update_camera(camera, player)
     if multilink and opponent:
         received = update_multi(player, opponent)
@@ -821,27 +824,54 @@ def update_race(camera, trak, player, opponent=None, multilink=False):
 
 
 # screen length vertical loading bar
-def draw_loading_bar(value, total, x):
-    disp.drawRectangle(x, 0, 5, SCREEN_H, 1)
+def draw_loading_bar_v(value, x, y, h):
+    global LOADING_BAR_SIZE
+    # clamp value
+    value = min(1, value)
+    disp.drawFilledRectangle(x, y, LOADING_BAR_SIZE, h, 0)
+    disp.drawRectangle(x, y, LOADING_BAR_SIZE, h, 1)
     disp.drawFilledRectangle(
-        x, 0,
-        5, int(value/total * SCREEN_H), 
+        x, y+h - int(value * h),
+        LOADING_BAR_SIZE, int(value * h), 
         1
     )
+
+
+def draw_loading_bar_h(value, x, y, w):
+    global LOADING_BAR_SIZE
+    # clamp value
+    value = min(1, value)
+    disp.drawFilledRectangle(x, y, w, LOADING_BAR_SIZE, 0)
+    disp.drawRectangle(x, y, w, LOADING_BAR_SIZE, 1)
+    disp.drawFilledRectangle(
+        x, y,
+        int(value * w), LOADING_BAR_SIZE,
+        1
+    )
+
+
+def draw_text(msg, x, y):
+    disp.drawFilledRectangle(x, y, (MINI_FONT_W+1)*len(msg), MINI_FONT_H+1, 0)
+    disp.drawText(msg, x, y, 1)
 
 
 def draw_hud(player, race_time):
     global RACER_MAX_FORCE
     util.set_font(MINI_FONT_W, MINI_FONT_H)
     # draw speed
-    disp.drawFilledRectangle(0, 0, (MINI_FONT_W+1)*6, MINI_FONT_H+1, 0)
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
-    disp.drawText(f"{mph:>3}mph", 0, 0, 1)
+    draw_text(f"{mph:>3}mph", 0, 0)
     #disp.drawText(f"{player["rv"]}", 0, MINI_FONT_H+1, 1)
     disp.drawText(f"{RACER_MAX_FORCE}", 0, 5*(MINI_FONT_H+1), 1)
 
-    draw_loading_bar(get_racer_force(player), RACER_MAX_FORCE, SCREEN_W-5)
-    draw_loading_bar(player["dmg"], RACER_MAX_DMG, SCREEN_W-10)
+    draw_loading_bar_v(
+        get_racer_force(player)/RACER_MAX_FORCE,
+        SCREEN_W-5, SCREEN_H-LOADING_BAR_LENGTH, LOADING_BAR_LENGTH
+    )
+    draw_loading_bar_v(
+        player["dmg"]/RACER_MAX_DMG,
+        SCREEN_W-10, SCREEN_H-LOADING_BAR_LENGTH, LOADING_BAR_LENGTH
+    )
 
 
 def draw_debug(camera, trak, player):

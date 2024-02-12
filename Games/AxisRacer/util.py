@@ -52,6 +52,8 @@ def dprint(*args, **kwargs):
 
 
 def framerate():
+    # creates a framerate generator object
+    # where if called once per frame it will return fps
     old_time = time.ticks_us()
     yield 0
     while True:
@@ -64,4 +66,3 @@ def framerate():
 
 def new_seed():
     return time.ticks_cpu()
-
