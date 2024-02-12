@@ -12,11 +12,12 @@ import util
 import save
 import splash
 import multi
+import timer
 # trak size will be roughly TRAK_SCALE * screensize
 global TRAK_SCALE
 TRAK_SCALE = const(10)
 global TRAK_SEGMENT_LENGTH
-TRAK_SEGMENT_LENGTH = const(8)
+TRAK_SEGMENT_LENGTH = const(6)
 
 global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
@@ -834,7 +835,7 @@ def update_racer(racer, points, use_v=True, check_derail=False):
 
 def get_camera_segment(racer, points):
     # look ahead of racer segment
-    return (racer["seg"] + 1) % (len(points)//2)
+    return (racer["seg"] + 2) % (len(points)//2)
 
 
 def update_camera(camera, racer, points):
@@ -855,7 +856,7 @@ def update_multi(player, opponent):
     return received
 
 
-def update_race(camera, trak, player, opponent=None, multilink=False):
+def update_race(camera, trak, race_timer, player, opponent=None, multilink=False):
     points = trak["trak"]
     # process input
     player_input(player, points)
@@ -869,6 +870,7 @@ def update_race(camera, trak, player, opponent=None, multilink=False):
         update_racer(opponent, points, use_v = not received)
     elif opponent: # cpu
         update_racer(opponent, points)
+    timer.update_timer(race_timer)
 
 
 # screen length vertical loading bar
@@ -903,7 +905,7 @@ def draw_text(msg, x, y):
     disp.drawText(msg, x, y, 1)
 
 
-def draw_hud(player, race_time):
+def draw_hud(player, race_timer):
     global RACER_MAX_FORCE
     util.set_font(MINI_FONT_W, MINI_FONT_H)
     # draw speed
@@ -912,15 +914,22 @@ def draw_hud(player, race_time):
     #disp.drawText(f"{player["rv"]}", 0, MINI_FONT_H+1, 1)
     #draw_text(f"{RACER_MAX_FORCE:.2f}", 0, 5*(MINI_FONT_H+1))
     draw_loading_bar_v(
+        player["v"]/RACER_MAX_SPEED,
+        SCREEN_W-LOADING_BAR_SIZE, SCREEN_H-LOADING_BAR_LENGTH,
+        LOADING_BAR_LENGTH
+    )
+    draw_loading_bar_v(
         get_racer_force(player)/RACER_MAX_FORCE,
-        SCREEN_W-5, SCREEN_H-LOADING_BAR_LENGTH,
+        SCREEN_W-LOADING_BAR_SIZE*2, SCREEN_H-LOADING_BAR_LENGTH,
         LOADING_BAR_LENGTH
     )
     draw_loading_bar_v(
         player["dmg"]/RACER_MAX_DMG,
-        SCREEN_W-10, SCREEN_H-LOADING_BAR_LENGTH,
+        SCREEN_W-LOADING_BAR_SIZE*3, SCREEN_H-LOADING_BAR_LENGTH,
         LOADING_BAR_LENGTH
     )
+    t = f"{race_timer["time"]:.1f}"
+    draw_text(t, SCREEN_W-len(t)*(MINI_FONT_W+1), 0)
 
 
 def draw_debug(camera, trak, player):
@@ -937,7 +946,7 @@ def draw_debug(camera, trak, player):
     disp.drawLine(px, py, px+nx, py+ny, 1)
 
 
-def draw_race(camera, trak, blocker, player, opponent=None):
+def draw_race(camera, trak, race_timer, blocker, player, opponent=None):
     global RACE_SEGMENT_RANGE
     disp.fill(0)
     draw_trak(
@@ -951,7 +960,7 @@ def draw_race(camera, trak, blocker, player, opponent=None):
     if util.DEBUG_MODE:
         draw_debug(camera, trak, player)
     draw_racer(camera, player, blocker)
-    draw_hud(player, None)
+    draw_hud(player, race_timer)
     disp.update()
 
 
@@ -977,12 +986,12 @@ def race(trak, multilink = False):
         0, 0,
         1
     )
-    
+    race_timer = timer.get_race_timer()
     # start in trak preview position
     #update_camera_preview(camera, trak))
     while True:
         #input()
         if thumbyButton.buttonB.justPressed():
             break
-        update_race(camera, trak, player, opponent, multilink)
-        draw_race(camera, trak, blocker, player, opponent)
+        update_race(camera, trak, race_timer, player, opponent, multilink)
+        draw_race(camera, trak, race_timer, blocker, player, opponent)
