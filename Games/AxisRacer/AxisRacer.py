@@ -5,7 +5,6 @@ global GAME_NAME
 GAME_NAME = "AxisRacer"
 
 import math
-import time
 import sys
 
 import thumby

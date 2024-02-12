@@ -34,8 +34,8 @@ BIG_FONT_W = const(8)
 BIG_FONT_H = const(8)
 
 global LOADING_BAR_SIZE, LOADING_BAR_LENGTH
-LOADING_BAR_SIZE = 5
-LOADING_BAR_LENGTH = 20
+LOADING_BAR_SIZE = 4
+LOADING_BAR_LENGTH = 14
 
 global TRAK_PREVIEW_W, TRAK_PREVIEW_H
 TRAK_PREVIEW_W = const(SCREEN_W - (FONT_W+1)*2)
@@ -47,10 +47,10 @@ global RACE_SEGMENT_RANGE
 RACE_SEGMENT_RANGE = (max(SCREEN_W, SCREEN_H) // TRAK_SEGMENT_LENGTH) + 1 
 
 global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG, RACER_FORCE_POWER
-RACER_MAX_SPEED = 4
+RACER_MAX_SPEED = 5
 RACER_FORCE_POWER = 1.5
-RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
-RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.02
+RACER_MAX_MPH = 250 # mph value is display equivalent to max speed
+RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.006
 RACER_MAX_DMG = 6
 
 global RACER_ACCELERATION, RACER_DECCELERATION
@@ -910,7 +910,6 @@ def draw_hud(player, race_timer):
     util.set_font(MINI_FONT_W, MINI_FONT_H)
     # draw speed
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
-    draw_text(f"{mph:>3}mph", SCREEN_W-LOADING_BAR_SIZE*2-(MINI_FONT_W+1)*6, SCREEN_H-MINI_FONT_H)
     #disp.drawText(f"{player["rv"]}", 0, MINI_FONT_H+1, 1)
     #draw_text(f"{RACER_MAX_FORCE:.2f}", 0, 5*(MINI_FONT_H+1))
     draw_loading_bar_v(
@@ -920,16 +919,22 @@ def draw_hud(player, race_timer):
     )
     draw_loading_bar_v(
         get_racer_force(player)/RACER_MAX_FORCE,
-        SCREEN_W-LOADING_BAR_SIZE*2, SCREEN_H-LOADING_BAR_LENGTH,
-        LOADING_BAR_LENGTH
+        SCREEN_W-LOADING_BAR_SIZE*2, SCREEN_H-LOADING_BAR_LENGTH + 2,
+        LOADING_BAR_LENGTH - 2
     )
     draw_loading_bar_v(
         player["dmg"]/RACER_MAX_DMG,
-        SCREEN_W-LOADING_BAR_SIZE*3, SCREEN_H-LOADING_BAR_LENGTH,
-        LOADING_BAR_LENGTH
+        SCREEN_W-LOADING_BAR_SIZE*3, SCREEN_H-LOADING_BAR_LENGTH + 4,
+        LOADING_BAR_LENGTH - 4
+    )
+    draw_text(
+        f"{mph:>3}mph",
+        SCREEN_W-LOADING_BAR_SIZE*3-(MINI_FONT_W+1)*6,
+        SCREEN_H-MINI_FONT_H
     )
     t = f"{race_timer["time"]:.1f}"
     draw_text(t, SCREEN_W-len(t)*(MINI_FONT_W+1), 0)
+    draw_framerate()
 
 
 def draw_debug(camera, trak, player):
