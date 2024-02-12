@@ -47,9 +47,9 @@ RACE_SEGMENT_RANGE = (max(SCREEN_W, SCREEN_H) // TRAK_SEGMENT_LENGTH) + 1
 
 global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG, RACER_FORCE_POWER
 RACER_MAX_SPEED = 4
-RACER_FORCE_POWER = 1.7
+RACER_FORCE_POWER = 1.5
 RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
-RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.022
+RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.02
 RACER_MAX_DMG = 6
 
 global RACER_ACCELERATION, RACER_DECCELERATION
@@ -179,17 +179,22 @@ def update_racer_seg_t(racer, points):
         racer["t"] -=1
 
 
+def interpolate_seg(seg, t, points):
+    i0 = seg*2 # double since points are x, y
+    i1 = next_idx(i0, points)
+    # get start/end of current segment
+    x0, y0 = points[i0], points[i0+1]
+    x1, y1 = points[i1], points[i1+1]
+    # interpolate along the segment
+    x = (1-t)*x0 + t*x1
+    y = (1-t)*y0 + t*y1
+    return x, y
+
+
 def update_racer_pos(racer, points):
     if racer["on"]:
         t = racer["t"]
-        i0 = racer["seg"]*2 # double since points are x, y
-        i1 = next_idx(i0, points)
-        # get start/end of current segment
-        x0, y0 = points[i0], points[i0+1]
-        x1, y1 = points[i1], points[i1+1]
-        # interpolate along the segment
-        racer["x"] = (1-t)*x0 + t*x1
-        racer["y"] = (1-t)*y0 + t*y1
+        racer["x"], racer["y"] = interpolate_seg(racer["seg"], racer["t"], points)
     else: # derail
         racer["x"] += racer["v"] * math.sin(racer["r"])
         racer["y"] -= racer["v"] * math.cos(racer["r"])
@@ -302,12 +307,12 @@ def get_rot_frame_offset(angle, size=2):
     return frame_offsets[frame]
 
 
-def next_idx(i, trak):
-    return (i+2) % len(trak)
+def next_idx(i, points, n=1):
+    return (i+n*2) % len(points)
 
 
-def prev_idx(i, trak):
-    return (i-2) % len(trak)
+def prev_idx(i, points, n=1):
+    return (i-n*2) % len(points)
 
 
 def draw_trak_ui(name, num, fave, view_only=False):
@@ -791,7 +796,7 @@ def accelerate(racer):
 
 
 def deccelerate(racer):
-    dec = RACER_DECCELERATION * racer["v"]/RACER_MAX_SPEED
+    dec = (RACER_DECCELERATION * racer["v"]/RACER_MAX_SPEED * 0.5) + (RACER_DECCELERATION * 0.5)
     racer["v"] -= dec
 
 
@@ -808,11 +813,12 @@ def player_input(racer, points):
     if thumbyButton.buttonD.justPressed():
         rerail(racer, points)
     
+    """
     if thumbyButton.buttonL.justPressed():
         RACER_MAX_FORCE -= 0.02
     if thumbyButton.buttonR.justPressed():
         RACER_MAX_FORCE += 0.02
-
+    """
     racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
 
 
@@ -826,9 +832,19 @@ def update_racer(racer, points, use_v=True, check_derail=False):
         update_racer_derail(racer, points)
 
 
+def get_camera_segment(racer, points):
+    # look ahead of racer segment
+    return (racer["seg"] + 1) % (len(points)//2)
 
-def update_camera(camera, racer):
-    translate(camera, racer["x"], racer["y"])
+
+def update_camera(camera, racer, points):
+    if racer["on"]:
+        seg = get_camera_segment(racer, points)
+        x, y = interpolate_seg(seg, racer["t"], points)
+        translate(camera, x, y)
+    else:
+        camera["x"] += racer["v"] * math.sin(racer["r"])
+        camera["y"] -= racer["v"] * math.cos(racer["r"])
 
 
 def update_multi(player, opponent):
@@ -840,18 +856,19 @@ def update_multi(player, opponent):
 
 
 def update_race(camera, trak, player, opponent=None, multilink=False):
+    points = trak["trak"]
     # process input
-    player_input(player, trak["trak"])
+    player_input(player, points)
 
-    update_racer(player, trak["trak"], check_derail=True)
-    update_camera(camera, player)
+    update_racer(player, points, check_derail=True)
+    update_camera(camera, player, points)
     if multilink and opponent:
         received = update_multi(player, opponent)
         # if we've received data, no need to update seg/t from v
         # but if we didn't receieve any data, use v to estimate next seg/t
-        update_racer(opponent, trak["trak"], use_v = not received)
+        update_racer(opponent, points, use_v = not received)
     elif opponent: # cpu
-        update_racer(opponent, trak["trak"])
+        update_racer(opponent, points)
 
 
 # screen length vertical loading bar
@@ -923,7 +940,12 @@ def draw_debug(camera, trak, player):
 def draw_race(camera, trak, blocker, player, opponent=None):
     global RACE_SEGMENT_RANGE
     disp.fill(0)
-    draw_trak(camera, trak, segment=player["seg"], segment_range=RACE_SEGMENT_RANGE)
+    draw_trak(
+        camera,
+        trak,
+        segment = get_camera_segment(player, trak["trak"]),
+        segment_range = RACE_SEGMENT_RANGE
+    )
     if opponent:
         draw_racer(camera, opponent, blocker)
     if util.DEBUG_MODE:
@@ -955,6 +977,7 @@ def race(trak, multilink = False):
         0, 0,
         1
     )
+    
     # start in trak preview position
     #update_camera_preview(camera, trak))
     while True:
