@@ -40,16 +40,16 @@ global TRAK_PREVIEW_W, TRAK_PREVIEW_H
 TRAK_PREVIEW_W = const(SCREEN_W - (FONT_W+1)*2)
 TRAK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
 
-# how many trak segments to draw before/after center
+# how many trak segments to draw before/after camera center
 global RACE_SEGMENT_RANGE
 # there and back again
-RACE_SEGMENT_RANGE = ((max(SCREEN_W, SCREEN_H)) // TRAK_SEGMENT_LENGTH) + 1 
+RACE_SEGMENT_RANGE = (max(SCREEN_W, SCREEN_H) // TRAK_SEGMENT_LENGTH) + 1 
 
 global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG
 RACER_MAX_SPEED = 4
 RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
-RACER_MAX_FORCE = RACER_MAX_SPEED * 0.05
-RACER_MAX_DMG = 10
+RACER_MAX_FORCE = RACER_MAX_SPEED * 0.02
+RACER_MAX_DMG = 6
 
 global RACER_ACCELERATION, RACER_DECCELERATION
 RACER_ACCELERATION = 0.05
@@ -193,9 +193,8 @@ def update_racer_pos(racer, points):
 
 def update_racer_rot(racer, points, calculate_rv=True):
     if racer["on"]:
-        # TODO: use next segment??
         i = racer["seg"]*2  # double since points are x, y
-        i0 = i #next_idx(i, points) # we actually check the next segment
+        i0 = next_idx(i, points) # we actually check the next segment
         i1 = next_idx(i0, points) 
         x0, y0 = points[i0], points[i0+1]
         x1, y1 = points[i1], points[i1+1]
@@ -238,7 +237,7 @@ def update_racer_dmg(racer):
         racer["dmg"] -= RACER_MAX_SPEED - racer["v"]
     racer["dmg"] = max(0, racer["dmg"])
     if racer["dmg"] > RACER_MAX_DMG:
-        derail()
+        derail(racer)
 
 
 def derail(racer):
