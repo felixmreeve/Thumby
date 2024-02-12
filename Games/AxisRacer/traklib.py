@@ -45,10 +45,11 @@ global RACE_SEGMENT_RANGE
 # there and back again
 RACE_SEGMENT_RANGE = (max(SCREEN_W, SCREEN_H) // TRAK_SEGMENT_LENGTH) + 1 
 
-global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG
+global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG, RACER_FORCE_POWER
 RACER_MAX_SPEED = 4
+RACER_FORCE_POWER = 1.7
 RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
-RACER_MAX_FORCE = RACER_MAX_SPEED * 0.02
+RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.02
 RACER_MAX_DMG = 6
 
 global RACER_ACCELERATION, RACER_DECCELERATION
@@ -194,7 +195,7 @@ def update_racer_pos(racer, points):
 def update_racer_rot(racer, points, calculate_rv=True):
     if racer["on"]:
         i = racer["seg"]*2  # double since points are x, y
-        i0 = next_idx(i, points) # we actually check the next segment
+        i0 = i #next_idx(i, points) # we actually check the next segment
         i1 = next_idx(i0, points) 
         x0, y0 = points[i0], points[i0+1]
         x1, y1 = points[i1], points[i1+1]
@@ -232,7 +233,8 @@ def update_racer_dmg(racer):
     global RACER_MAX_FORCE
     force = get_racer_force(racer)
     if force > RACER_MAX_FORCE:
-        racer["dmg"] += force - RACER_MAX_FORCE
+        # maximum dmg change per frame is small
+        racer["dmg"] += min(force - RACER_MAX_FORCE, RACER_MAX_DMG*0.19)
     else:
         racer["dmg"] -= RACER_MAX_SPEED - racer["v"]
     racer["dmg"] = max(0, racer["dmg"])
@@ -246,7 +248,7 @@ def derail(racer):
 
 def rerail(racer, points):
     racer["on"] = True
-    racer["seg"] = (racer["seg"] + 1) % (len(points)//2)
+    racer["seg"] = (racer["seg"] - 4) % (len(points)//2)
     racer["t"] = 0
     racer["v"] = 0
     racer["_r"] = racer["r"] # reset visual rotation
@@ -256,8 +258,8 @@ def rerail(racer, points):
 
 
 def get_racer_force(racer):
-    # rv**2 * v
-    return abs(racer["rv"] * racer["rv"] * racer["v"])
+    # use power of rv to increase effect
+    return abs(racer["rv"] * racer["v"]) ** RACER_FORCE_POWER * racer["v"]/RACER_MAX_SPEED
 
 
 def get_rot_frame(angle):
