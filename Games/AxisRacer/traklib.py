@@ -49,12 +49,15 @@ global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG, RACER_FOR
 RACER_MAX_SPEED = 4
 RACER_FORCE_POWER = 1.7
 RACER_MAX_MPH = 200 # mph value is display equivalent to max speed
-RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.02
+RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.022
 RACER_MAX_DMG = 6
 
 global RACER_ACCELERATION, RACER_DECCELERATION
 RACER_ACCELERATION = 0.05
 RACER_DECCELERATION = 0.08
+
+global RACER_RERAIL_FRAMES
+RACER_RERAIL_FRAMES = 20
 
 
 def get_fave_heart():
@@ -195,7 +198,7 @@ def update_racer_pos(racer, points):
 def update_racer_rot(racer, points, calculate_rv=True):
     if racer["on"]:
         i = racer["seg"]*2  # double since points are x, y
-        i0 = i #next_idx(i, points) # we actually check the next segment
+        i0 = next_idx(i, points) # we actually check the next segment
         i1 = next_idx(i0, points) 
         x0, y0 = points[i0], points[i0+1]
         x1, y1 = points[i1], points[i1+1]
@@ -229,26 +232,32 @@ def update_racer_rot(racer, points, calculate_rv=True):
             racer["_r"] += math.pi / 8
 
 
-def update_racer_dmg(racer):
-    global RACER_MAX_FORCE
-    force = get_racer_force(racer)
-    if force > RACER_MAX_FORCE:
-        # maximum dmg change per frame is small
-        racer["dmg"] += min(force - RACER_MAX_FORCE, RACER_MAX_DMG*0.19)
+def update_racer_derail(racer, points):
+    global RACER_MAX_FORCE, RACER_RERAIL_FRAMES
+    if racer["on"]:
+        force = get_racer_force(racer)
+        if force > RACER_MAX_FORCE:
+            # maximum dmg change per frame is small
+            racer["dmg"] += min(force - RACER_MAX_FORCE, RACER_MAX_DMG*0.19)
+        else:
+            racer["dmg"] -= RACER_MAX_SPEED - racer["v"]
+        racer["dmg"] = max(0, racer["dmg"])
+        if racer["dmg"] > RACER_MAX_DMG:
+            derail(racer)
     else:
-        racer["dmg"] -= RACER_MAX_SPEED - racer["v"]
-    racer["dmg"] = max(0, racer["dmg"])
-    if racer["dmg"] > RACER_MAX_DMG:
-        derail(racer)
+        racer["t"] += 1/RACER_RERAIL_FRAMES
+        if racer["t"] >= 1:
+            rerail(racer, points)
 
 
 def derail(racer):
     racer["on"] = False
+    racer["t"] = 0 # we'll use t to track how long before it's back on
 
 
 def rerail(racer, points):
     racer["on"] = True
-    racer["seg"] = (racer["seg"] - 4) % (len(points)//2)
+    racer["seg"] = (racer["seg"] + 1) % (len(points)//2)
     racer["t"] = 0
     racer["v"] = 0
     racer["_r"] = racer["r"] # reset visual rotation
@@ -787,14 +796,15 @@ def player_input(racer, points):
     racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
 
 
-def update_racer(racer, points, use_v=True, check_dmg=False):
+def update_racer(racer, points, use_v=True, check_derail=False):
     if use_v and racer["on"]:
         update_racer_seg_t(racer, points)
     update_racer_pos(racer, points)
     update_racer_rot(racer, points)
 
-    if check_dmg:
-        update_racer_dmg(racer)
+    if check_derail:
+        update_racer_derail(racer, points)
+
 
 
 def update_camera(camera, racer):
@@ -813,7 +823,7 @@ def update_race(camera, trak, player, opponent=None, multilink=False):
     # process input
     player_input(player, trak["trak"])
 
-    update_racer(player, trak["trak"], check_dmg=True)
+    update_racer(player, trak["trak"], check_derail=True)
     update_camera(camera, player)
     if multilink and opponent:
         received = update_multi(player, opponent)
@@ -863,7 +873,7 @@ def draw_hud(player, race_time):
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
     draw_text(f"{mph:>3}mph", 0, 0)
     #disp.drawText(f"{player["rv"]}", 0, MINI_FONT_H+1, 1)
-    disp.drawText(f"{RACER_MAX_FORCE}", 0, 5*(MINI_FONT_H+1), 1)
+    draw_text(f"{RACER_MAX_FORCE:.2f}", 0, 5*(MINI_FONT_H+1))
 
     draw_loading_bar_v(
         get_racer_force(player)/RACER_MAX_FORCE,
