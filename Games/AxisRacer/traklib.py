@@ -785,13 +785,23 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
     return trak
 
 
+def accelerate(racer):
+    acc = RACER_ACCELERATION * (RACER_MAX_SPEED - racer["v"])/RACER_MAX_SPEED
+    racer["v"] += acc
+
+
+def deccelerate(racer):
+    dec = RACER_DECCELERATION * racer["v"]/RACER_MAX_SPEED
+    racer["v"] -= dec
+
+
 def player_input(racer, points):
     global RACER_MAX_FORCE
     if racer["on"]:
         if thumbyButton.buttonA.pressed():
-            racer["v"] += RACER_ACCELERATION
+            accelerate(racer)
         else:
-            racer["v"] -= RACER_DECCELERATION
+            deccelerate(racer)
     
     if thumbyButton.buttonU.justPressed():
         derail(racer)
@@ -881,23 +891,23 @@ def draw_hud(player, race_time):
     util.set_font(MINI_FONT_W, MINI_FONT_H)
     # draw speed
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
-    draw_text(f"{mph:>3}mph", 0, 0)
+    draw_text(f"{mph:>3}mph", SCREEN_W-LOADING_BAR_SIZE*2-(MINI_FONT_W+1)*6, SCREEN_H-MINI_FONT_H)
     #disp.drawText(f"{player["rv"]}", 0, MINI_FONT_H+1, 1)
-    draw_text(f"{RACER_MAX_FORCE:.2f}", 0, 5*(MINI_FONT_H+1))
-
+    #draw_text(f"{RACER_MAX_FORCE:.2f}", 0, 5*(MINI_FONT_H+1))
     draw_loading_bar_v(
         get_racer_force(player)/RACER_MAX_FORCE,
-        SCREEN_W-5, SCREEN_H-LOADING_BAR_LENGTH, LOADING_BAR_LENGTH
+        SCREEN_W-5, SCREEN_H-LOADING_BAR_LENGTH,
+        LOADING_BAR_LENGTH
     )
     draw_loading_bar_v(
         player["dmg"]/RACER_MAX_DMG,
-        SCREEN_W-10, SCREEN_H-LOADING_BAR_LENGTH, LOADING_BAR_LENGTH
+        SCREEN_W-10, SCREEN_H-LOADING_BAR_LENGTH,
+        LOADING_BAR_LENGTH
     )
 
 
 def draw_debug(camera, trak, player):
     points = trak["trak"]
-
     px, py = view_transform(camera, player["x"], player["y"])
     i0 = player["seg"] * 2
     i1 = next_idx(i0, points)
@@ -907,7 +917,6 @@ def draw_debug(camera, trak, player):
     # end point is based on player force
     nx = int(nx * (player["rv"]/RACER_MAX_FORCE) * 20)
     ny = int(ny * (player["rv"]/RACER_MAX_FORCE) * 20)
-
     disp.drawLine(px, py, px+nx, py+ny, 1)
 
 
