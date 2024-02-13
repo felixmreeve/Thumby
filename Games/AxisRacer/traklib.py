@@ -18,7 +18,7 @@ import util
 global TRAK_SCALE
 TRAK_SCALE = const(10)
 global TRAK_SEGMENT_LENGTH
-TRAK_SEGMENT_LENGTH = const(6)
+TRAK_SEGMENT_LENGTH = const(7)
 
 global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
@@ -760,7 +760,7 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
                 trak_num += 1
             #trak = []
             trak = generate_trak(seed, trak, trak_num, faves)
-        if trak_num > 0 and inpt.justPressed(butt.buttonL):
+        if trak_num > 0 and inpt.pressed(butt.buttonL):
             trak_num -= 1
             #trak = []
             trak = generate_trak(seed, trak, trak_num, faves)
@@ -807,7 +807,9 @@ def deccelerate(racer):
 
 def player_input(racer, points):
     global RACER_MAX_FORCE
-    inpt.update_input()
+    quit = False
+    if inpt.justPressed(butt.buttonB):
+        quit = True
     if racer["on"]:
         if inpt.pressed(butt.buttonA):
             accelerate(racer)
@@ -824,6 +826,7 @@ def player_input(racer, points):
         RACER_MAX_FORCE += 0.02
     """
     racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
+    return quit
 
 
 def update_racer(racer, points, use_v=True, check_derail=False):
@@ -860,10 +863,11 @@ def update_multi(player, opponent):
 
 
 def update_race(camera, trak, race_timer, player, opponent=None, multilink=False):
+    quit = False
     points = trak["trak"]
     # process input
-    player_input(player, points)
-
+    if race_timer["time"] >= 0:
+        quit = player_input(player, points)
     update_racer(player, points, check_derail=True)
     update_camera(camera, player, points)
 
@@ -876,6 +880,8 @@ def update_race(camera, trak, race_timer, player, opponent=None, multilink=False
         update_racer(opponent, points)
 
     timer.update_timer(race_timer)
+    print(quit)
+    return quit
 
 
 # screen length vertical loading bar
@@ -999,9 +1005,11 @@ def race(trak, multilink = False):
     race_timer = timer.get_race_timer()
     # start in trak preview position
     #update_camera_preview(camera, trak))
+    
     while True:
         inpt.update_input()
-        if inpt.justPressed(butt.buttonB):
-            break
-        update_race(camera, trak, race_timer, player, opponent, multilink)
+        quit = update_race(camera, trak, race_timer, player, opponent, multilink)
         draw_race(camera, trak, race_timer, blocker, player, opponent)
+        if quit:
+            break
+    util.set_font(FONT_W, FONT_H)

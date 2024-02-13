@@ -66,4 +66,3 @@ def framerate():
 
 def new_seed():
     return time.ticks_cpu()
-

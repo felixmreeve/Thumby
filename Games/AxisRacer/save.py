@@ -6,11 +6,11 @@ import util
 def load_seed():
     util.dprint("loading data")
     saveData.setName(util.GAME_NAME)
-    
+
     util.dprint("loading seed")
     seed = saveData.getItem("seed")
     util.dprint(f"seed: {seed}")
-    
+
     if util.DEBUG_MODE and util.DEBUG_FIXED_SEED: seed = 0
     return seed
 
