@@ -175,17 +175,20 @@ def get_racer(sprite, points):
     return racer
 
 
+def seg_to_idx(seg, points):
+    return (seg * 2) % len(points)
+
 def update_racer_seg_t(racer, points):
     # move along segment by velocity
     racer["t"] += racer["v"] / TRAK_SEGMENT_LENGTH
     # move to next segment if t > 1
     while racer["t"] >= 1:
-        racer["seg"] = (racer["seg"] + 1) % (len(points)//2)
+        racer["seg"] = racer["seg"] + 1
         racer["t"] -=1
 
 
 def interpolate_seg(seg, t, points):
-    i0 = seg*2 # double since points are x, y
+    i0 = seg_to_idx(seg, points)
     i1 = next_idx(i0, points)
     # get start/end of current segment
     x0, y0 = points[i0], points[i0+1]
@@ -219,7 +222,7 @@ def get_seg_angle(i0, points):
 
 def update_racer_rot(racer, points, calculate_rv=True):
     if racer["on"]:
-        i = racer["seg"]*2  # double since points are x, y
+        i = seg_to_idx(racer["seg"], points)
         # we actually check 2 segments ahead to look like drifting
         # and encourage slowing down before corners
         # and speeding up coming out of corners
@@ -237,8 +240,6 @@ def update_racer_rot(racer, points, calculate_rv=True):
                     rv = -2*math.pi + rv
                 elif rv < -math.pi:
                     rv = 2*math.pi + rv
-                # use sqrt to remap a bit to change the weight
-                #rv = math.copysign(math.sqrt(abs(rv)), rv)
                 racer["rv"] = rv # racer["rv"][0], racer["rv"][1]
             racer["r"] = angle
             racer["_r"] = angle
@@ -272,12 +273,12 @@ def update_racer_derail(racer, points):
 def derail(racer, points):
     racer["on"] = False
     racer["t"] = 0 # we'll use t to track how long before it's back on
-    i = racer["seg"]*2  # double since points are x, y
+    i = seg_to_idx(racer["seg"], points)
     racer["r"] = get_seg_angle(i, points)
 
 def rerail(racer, points):
     racer["on"] = True
-    racer["seg"] = (racer["seg"] + 1) % (len(points)//2)
+    #racer["seg"] = racer["seg"] + 1
     racer["t"] = 0
     racer["v"] = 0
     racer["_r"] = racer["r"] # reset visual rotation
@@ -349,8 +350,8 @@ def draw_trak(camera, trak, preview = False, segment = None, segment_range = Non
         start = 0
         end = len(points)
     else:
-        start = ((segment - segment_range)*2) % len(points)
-        end = ((segment + segment_range+1)*2) % len(points)
+        start = seg_to_idx((segment-segment_range), points)
+        end = seg_to_idx((segment+segment_range+1), points)
 
     if end < start:
         # need two ranges at end/start of trak
@@ -841,7 +842,7 @@ def update_racer(racer, points, use_v=True, check_derail=False):
 
 def get_camera_segment(racer, points):
     # look ahead of racer segment
-    return (racer["seg"] + 2) % (len(points)//2)
+    return racer["seg"] + 2
 
 
 def update_camera(camera, racer, points):
@@ -927,42 +928,49 @@ def draw_start_hud(race_timer):
     msg = "READY?"
     time = -int(race_timer["time"])
     if time > 0:
-        draw_text(msg, (SCREEN_W-len(msg)*(FONT_W+1))//2, 1)
+        draw_text(msg, (SCREEN_W - len(msg) * (FONT_W + 1)) // 2, 1)
         msg = str(time)
     else:
         msg = "GO!"
-    draw_text(msg, (SCREEN_W-len(str(msg))*(FONT_W+1))//2, (SCREEN_H-(FONT_H+1))//2)
+    draw_text(
+        msg,
+        (SCREEN_W - len(str(msg)) * (FONT_W + 1)) // 2,
+        (SCREEN_H - (FONT_H + 1)) // 2
+    )
 
 
 def draw_hud(player, race_timer):
     global RACER_MAX_FORCE
-    mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
+    mph = int(player["v"] / RACER_MAX_SPEED * RACER_MAX_MPH)
     draw_loading_bar_v(
-        player["dmg"]/RACER_MAX_DMG,
-        SCREEN_W-LOADING_BAR_SIZE, SCREEN_H-LOADING_BAR_LENGTH,
+        player["dmg"] / RACER_MAX_DMG,
+        SCREEN_W - LOADING_BAR_SIZE,
+        SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1,
         LOADING_BAR_LENGTH
     )
     draw_loading_bar_v(
-        get_racer_force(player)/RACER_MAX_FORCE,
-        SCREEN_W-LOADING_BAR_SIZE*2, SCREEN_H-LOADING_BAR_LENGTH + 2,
+        get_racer_force(player) / RACER_MAX_FORCE,
+        SCREEN_W - LOADING_BAR_SIZE * 2,
+        SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1 + 2,
         LOADING_BAR_LENGTH - 2
     )
     draw_loading_bar_v(
-        player["v"]/RACER_MAX_SPEED,
-        SCREEN_W-LOADING_BAR_SIZE*3, SCREEN_H-LOADING_BAR_LENGTH + 4,
+        player["v"] / RACER_MAX_SPEED,
+        SCREEN_W - LOADING_BAR_SIZE * 3,
+        SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1 + 4,
         LOADING_BAR_LENGTH - 4
     )
     mph = f"{mph:>3}mph"
     draw_mini_text(
         mph,
         #(SCREEN_W - len(mph) * (MINI_FONT_W+1))//2,
-        SCREEN_W - LOADING_BAR_SIZE * 3 - (MINI_FONT_W+1) * 6,
-        (SCREEN_H - MINI_FONT_H - 1)
+        SCREEN_W - (MINI_FONT_W + 1) * 6, # - LOADING_BAR_SIZE * 3,
+        SCREEN_H - MINI_FONT_H
     )
     t = f"{race_timer["time"]:.1f}"
     draw_mini_text(
         t,
-        (SCREEN_W - len(t) * (MINI_FONT_W + 1))//2,
+        (SCREEN_W - len(t) * (MINI_FONT_W + 1)) // 2,
         #SCREEN_W - len(t) * (MINI_FONT_W + 1),
         0
     )
@@ -972,17 +980,18 @@ def draw_debug(camera, trak, player):
     global FRAMERATE
     points = trak["trak"]
     px, py = view_transform(camera, player["x"], player["y"])
-    i0 = player["seg"] * 2
+    i0 = seg_to_idx(player["seg"], points)
     i1 = next_idx(i0, points)
     x0, y0 = points[i0], points[i0+1]
     x1, y1 = points[i1], points[i1+1]
     nx, ny = get_normal_in(x0, y0, x1, y1)
     # end point is based on player force
-    nx = int(nx * (player["rv"]/RACER_MAX_FORCE) * 20)
-    ny = int(ny * (player["rv"]/RACER_MAX_FORCE) * 20)
+    nx = int(nx * (player["rv"]/0.5) * 30)
+    ny = int(ny * (player["rv"]/0.5) * 30)
     disp.drawLine(px, py, px+nx, py+ny, 1)
     fps = next(FRAMERATE)
     draw_text(str(fps), 0, 0)
+    draw_text(str(player["seg"]), 0, SCREEN_H - MINI_FONT_H)
 
 
 def draw_race(camera, trak, race_timer, blocker, player, opponent=None):
