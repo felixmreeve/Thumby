@@ -12,8 +12,9 @@ def get_timer():
 
 def get_race_timer():
     timer = get_timer()
-    timer["s_time"] = -3.0
-    timer["time"] = -3.0
+    timer["s_time"] = -4.0
+    timer["time"] = -4.0
+    timer["go"] = False
     return timer
 
 

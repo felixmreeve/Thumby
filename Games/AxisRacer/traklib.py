@@ -880,7 +880,10 @@ def update_race(camera, trak, race_timer, player, opponent=None, multilink=False
         update_racer(opponent, points)
 
     timer.update_timer(race_timer)
-    print(quit)
+    # hud font changes after race start
+    if not race_timer["go"] and race_timer["time"] >= 0:
+        race_timer["go"] = True
+        util.set_font(MINI_FONT_W, MINI_FONT_H)
     return quit
 
 
@@ -911,9 +914,24 @@ def draw_loading_bar_h(value, x, y, w):
     )
 
 
-def draw_text(msg, x, y):
+def draw_mini_text(msg, x, y):
     disp.drawFilledRectangle(x, y, (MINI_FONT_W+1)*len(msg), MINI_FONT_H+1, 0)
     disp.drawText(msg, x, y, 1)
+
+def draw_text(msg, x, y):
+    disp.drawFilledRectangle(x, y, (FONT_W+1)*len(msg), FONT_H+1, 0)
+    disp.drawText(msg, x, y, 1)
+
+
+def draw_start_hud(race_timer):
+    msg = "READY?"
+    time = -int(race_timer["time"])
+    if time > 0:
+        draw_text(msg, (SCREEN_W-len(msg)*(FONT_W+1))//2, 1)
+        msg = str(time)
+    else:
+        msg = "GO!"
+    draw_text(msg, (SCREEN_W-len(str(msg))*(FONT_W+1))//2, (SCREEN_H-(FONT_H+1))//2)
 
 
 def draw_hud(player, race_timer):
@@ -934,13 +952,20 @@ def draw_hud(player, race_timer):
         SCREEN_W-LOADING_BAR_SIZE*3, SCREEN_H-LOADING_BAR_LENGTH + 4,
         LOADING_BAR_LENGTH - 4
     )
-    draw_text(
-        f"{mph:>3}mph",
-        SCREEN_W-LOADING_BAR_SIZE*3-(MINI_FONT_W+1)*6,
-        SCREEN_H-MINI_FONT_H
+    mph = f"{mph:>3}mph"
+    draw_mini_text(
+        mph,
+        #(SCREEN_W - len(mph) * (MINI_FONT_W+1))//2,
+        SCREEN_W - LOADING_BAR_SIZE * 3 - (MINI_FONT_W+1) * 6,
+        (SCREEN_H - MINI_FONT_H - 1)
     )
     t = f"{race_timer["time"]:.1f}"
-    draw_text(t, SCREEN_W-len(t)*(MINI_FONT_W+1), 0)
+    draw_mini_text(
+        t,
+        (SCREEN_W - len(t) * (MINI_FONT_W + 1))//2,
+        #SCREEN_W - len(t) * (MINI_FONT_W + 1),
+        0
+    )
 
 
 def draw_debug(camera, trak, player):
@@ -975,14 +1000,18 @@ def draw_race(camera, trak, race_timer, blocker, player, opponent=None):
     if util.DEBUG_MODE:
         draw_debug(camera, trak, player)
     draw_racer(camera, player, blocker)
-    draw_hud(player, race_timer)
+    if race_timer["time"] >= 0:
+        draw_hud(player, race_timer)
+    else:
+        draw_start_hud(race_timer)
     disp.update()
 
 
 def race(trak, multilink = False):
     # 40fps is a medium between speedy 60 and slow 30
     disp.setFPS(40)
-    util.set_font(MINI_FONT_W, MINI_FONT_H)
+    # initial font for pre-race
+    util.set_font(FONT_W, FONT_H)
     racer_sprite = sprite.Sprite(
         7, 7,
         # BITMAP: width: 56, height: 7
@@ -1005,7 +1034,6 @@ def race(trak, multilink = False):
     race_timer = timer.get_race_timer()
     # start in trak preview position
     #update_camera_preview(camera, trak))
-    
     while True:
         inpt.update_input()
         quit = update_race(camera, trak, race_timer, player, opponent, multilink)
