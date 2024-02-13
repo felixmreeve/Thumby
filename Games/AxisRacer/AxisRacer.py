@@ -8,7 +8,7 @@ import math
 import sys
 
 import thumby
-import thumbyButton
+import thumbyButton as butt
 from thumbyGraphics import display as disp
 import thumbyHardware as hard
 # import game libs
@@ -53,13 +53,14 @@ def menu(*choices, selection=0, title=""):
     disp.setFPS(30)
     while True:
         # input
-        if thumbyButton.buttonD.justPressed():
+        inpt.update_input()
+        if inpt.justPressed(butt.buttonD):
             selection += 1
-        if thumbyButton.buttonU.justPressed():
+        if inpt.justPressed(butt.buttonU):
             selection -= 1
-        if thumbyButton.buttonA.justPressed():
+        if inpt.justPressed(butt.buttonA):
             return selection # int
-        if thumbyButton.buttonB.justPressed():
+        if inpt.justPressed(butt.buttonB):
             return -1 # back out
         selection %= len(choices)
         # draw
@@ -97,8 +98,8 @@ def display_error(msg):
         disp.update()
         pos += 1
         pos %= msg_len
-        if thumbyButton.buttonA.justPressed() \
-        or thumbyButton.buttonB.justPressed():
+        if inpt.justPressed(butt.buttonA) \
+        or inpt.justPressed(butt.buttonB):
             hard.reset()
 
 # currently not used
@@ -204,7 +205,7 @@ def handshake():
             multi.receive_handshake()
             break
         disp.update()
-        if thumbyButton.buttonB.justPressed():
+        if inpt.justPressed(butt.buttonB):
             break
     return player_num
 

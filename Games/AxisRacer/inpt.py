@@ -34,7 +34,8 @@ KEYS = [
 global INPUTS
 INPUTS = {}
 
-def updateInput():
+
+def update_input():
     global KEYS, INPUTS
     for key in KEYS:
         if key.justPressed():
@@ -44,11 +45,14 @@ def updateInput():
         else:
             INPUTS[key] = 0
 
+
 def justPressed(key):
     return INPUTS[key] == 2
 
+
 def pressed(key):
-    return INPUTS[KEY] > 0
+    return INPUTS[key] > 0
+
 
 def tapDir():
     x, y = 0, 0
@@ -61,6 +65,7 @@ def tapDir():
     elif justPressed(butt.buttonR):
         x += 1
     return x, y
+
 
 # keyboard input
 def keyboard(edit_msg = ""):
@@ -88,7 +93,6 @@ def keyboard(edit_msg = ""):
     sel_x = 0
     sel_y = 0
     while True:
-        # input
         updateInput()
         if justPressed(butt.buttonA):
             if sel_x == enter_x and sel_y == enter_y:

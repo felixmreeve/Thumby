@@ -1,18 +1,19 @@
 import math
 import random
 
-import thumbyButton
+import thumbyButton as butt
 from thumbyGraphics import display as disp
 import thumbySprite as sprite
 
 global GAME_NAME
 GAME_NAME = "AxisRacer"
 
-import util
+import inpt
+import multi
 import save
 import splash
-import multi
 import timer
+import util
 # trak size will be roughly TRAK_SCALE * screensize
 global TRAK_SCALE
 TRAK_SCALE = const(10)
@@ -35,7 +36,7 @@ BIG_FONT_H = const(8)
 
 global LOADING_BAR_SIZE, LOADING_BAR_LENGTH
 LOADING_BAR_SIZE = 4
-LOADING_BAR_LENGTH = 14
+LOADING_BAR_LENGTH = 12
 
 global TRAK_PREVIEW_W, TRAK_PREVIEW_H
 TRAK_PREVIEW_W = const(SCREEN_W - (FONT_W+1)*2)
@@ -50,7 +51,7 @@ global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG, RACER_FOR
 RACER_MAX_SPEED = 5
 RACER_FORCE_POWER = 1.5
 RACER_MAX_MPH = 250 # mph value is display equivalent to max speed
-RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.006
+RACER_MAX_FORCE = RACER_MAX_SPEED ** RACER_FORCE_POWER * 0.004
 RACER_MAX_DMG = 6
 
 global RACER_ACCELERATION, RACER_DECCELERATION
@@ -58,7 +59,7 @@ RACER_ACCELERATION = 0.05
 RACER_DECCELERATION = 0.08
 
 global RACER_RERAIL_FRAMES
-RACER_RERAIL_FRAMES = 20
+RACER_RERAIL_FRAMES = 40
 
 global FRAMERATE
 FRAMERATE = util.framerate()
@@ -256,7 +257,7 @@ def update_racer_derail(racer, points):
         force = get_racer_force(racer)
         if force > RACER_MAX_FORCE:
             # maximum dmg change per frame is small
-            racer["dmg"] += min(force - RACER_MAX_FORCE, RACER_MAX_DMG*0.19)
+            racer["dmg"] += min(force - RACER_MAX_FORCE, RACER_MAX_DMG*0.32)
         else:
             racer["dmg"] -= RACER_MAX_SPEED - racer["v"]
         racer["dmg"] = max(0, racer["dmg"])
@@ -749,8 +750,9 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
     trak = generate_trak(seed, None, trak_num, faves)
     util.dprint("entering trak select loop")
     while True:
+        inpt.update_input()
         if (not max_traks or trak_num < max_traks) \
-        and thumbyButton.buttonR.pressed():
+        and inpt.pressed(butt.buttonR):
             if trak_num == max_traks-1:
                 # if we reach the end of max_traks
                 splash.end_faves_splash()
@@ -758,19 +760,19 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
                 trak_num += 1
             #trak = []
             trak = generate_trak(seed, trak, trak_num, faves)
-        if trak_num > 0 and thumbyButton.buttonL.pressed():
+        if trak_num > 0 and inpt.justPressed(butt.buttonL):
             trak_num -= 1
             #trak = []
             trak = generate_trak(seed, trak, trak_num, faves)
         #hold in loop until a is pressed
-        if thumbyButton.buttonA.justPressed():
+        if inpt.justPressed(butt.buttonA):
             # trak is chosen
             break
-        if thumbyButton.buttonB.justPressed():
+        if inpt.justPressed(butt.buttonB):
             # cancel
             trak = {}
             break
-        if thumbyButton.buttonU.justPressed():
+        if inpt.justPressed(butt.buttonU):
             toggle_fave(trak)
 
         if multilink:
@@ -805,19 +807,20 @@ def deccelerate(racer):
 
 def player_input(racer, points):
     global RACER_MAX_FORCE
+    inpt.update_input()
     if racer["on"]:
-        if thumbyButton.buttonA.pressed():
+        if inpt.pressed(butt.buttonA):
             accelerate(racer)
         else:
             deccelerate(racer)
     """
-    if thumbyButton.buttonU.justPressed():
+    if inpt.justPressed(butt.buttonU):
         derail(racer)
-    if thumbyButton.buttonD.justPressed():
+    if input.justPressed(butt.buttonD):
         rerail(racer, points)
-    if thumbyButton.buttonL.justPressed():
+    if input.justPressed(butt.buttonL):
         RACER_MAX_FORCE -= 0.02
-    if thumbyButton.buttonR.justPressed():
+    if inpt.justPressed(butt.buttonR):
         RACER_MAX_FORCE += 0.02
     """
     racer["v"] = min(max(0, racer["v"]), RACER_MAX_SPEED)
@@ -909,10 +912,7 @@ def draw_text(msg, x, y):
 
 def draw_hud(player, race_timer):
     global RACER_MAX_FORCE
-    # draw speed
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
-    #disp.drawText(f"{player["rv"]}", 0, MINI_FONT_H+1, 1)
-    #draw_text(f"{RACER_MAX_FORCE:.2f}", 0, 5*(MINI_FONT_H+1))
     draw_loading_bar_v(
         player["dmg"]/RACER_MAX_DMG,
         SCREEN_W-LOADING_BAR_SIZE, SCREEN_H-LOADING_BAR_LENGTH,
@@ -1000,8 +1000,8 @@ def race(trak, multilink = False):
     # start in trak preview position
     #update_camera_preview(camera, trak))
     while True:
-        #input()
-        if thumbyButton.buttonB.justPressed():
+        inpt.update_input()
+        if inpt.justPressed(butt.buttonB):
             break
         update_race(camera, trak, race_timer, player, opponent, multilink)
         draw_race(camera, trak, race_timer, blocker, player, opponent)

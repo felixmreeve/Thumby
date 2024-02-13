@@ -1,6 +1,7 @@
-import thumbyButton
+import thumbyButton as butt
 from thumbyGraphics import display as disp
 
+import inpt
 import util
 
 global FONT_W, FONT_H
@@ -41,9 +42,10 @@ def main_splash():
     disp.drawText('A:start',0 , SCREEN_H-(FONT_H+1)*2, 1)
     disp.drawText('B:quit', 0, SCREEN_H-(FONT_H+1), 1)
     while True:
-        if thumbyButton.buttonA.justPressed():
+        inpt.update_input()
+        if inpt.justPressed(butt.buttonA):
             return True
-        if thumbyButton.buttonB.justPressed():
+        if inpt.justPressed(butt.buttonB):
             return False
         disp.update()
 
@@ -56,13 +58,8 @@ def no_faves_splash():
     util.set_font(MINI_FONT_W, MINI_FONT_H)
     disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
     disp.drawText("fave traks", FONT_W*2, SCREEN_H//2, 1)
-    while not thumbyButton.buttonB.justPressed():
-        if thumbyButton.buttonU.justPressed() \
-        or thumbyButton.buttonA.justPressed():
-            # hacky fix to avoid up having any effect
-            # TODO: write a better justPressed function
-            # to avoid this by checking all buttons
-            pass
+    while not inpt.justPressed(butt.buttonB):
+        inpt.update_input()
         disp.update()
 
 
@@ -75,14 +72,9 @@ def end_faves_splash():
     util.set_font(MINI_FONT_W, MINI_FONT_H)
     disp.drawText("press up to", FONT_W*2, SCREEN_H//2 - MINI_FONT_H-1, 1)
     disp.drawText("fave traks", FONT_W*2, SCREEN_H//2, 1)
-    while not (thumbyButton.buttonL.justPressed() \
-               or thumbyButton.buttonB.justPressed()):
-        if thumbyButton.buttonU.justPressed() \
-        or thumbyButton.buttonA.justPressed():
-            # hacky fix to avoid presses having any effect
-            # TODO: write a better justPressed function
-            # to avoid this by checking all buttons
-            pass
+    while not (inpt.justPressed(butt.buttonL) \
+               or inpt.justPressed(butt.buttonB)):
+        inpt.update_input()
         disp.update()
 
 
@@ -96,8 +88,8 @@ def reroll_splash():
     disp.drawText("fave traks", 0, (FONT_H+1)*2 + 2, 1)
     disp.drawText("will be safe", 0, (FONT_H+1)*2 + 2 + MINI_FONT_H+1, 1)
     while True:
-        if thumbyButton.buttonB.justPressed():
+        if inpt.justPressed(butt.buttonB):
             return False
-        if thumbyButton.buttonA.justPressed():
+        if inpt.justPressed(butt.buttonA):
             return True
         disp.update()
