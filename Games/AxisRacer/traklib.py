@@ -44,7 +44,7 @@ TRAK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
 # how many trak segments to draw before/after camera center
 global RACE_SEGMENT_RANGE
 # there and back again
-RACE_SEGMENT_RANGE = (max(SCREEN_W, SCREEN_H) // TRAK_SEGMENT_LENGTH) + 1 
+RACE_SEGMENT_RANGE = (max(SCREEN_W, SCREEN_H) // TRAK_SEGMENT_LENGTH) # + 1
 
 global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG, RACER_FORCE_POWER
 RACER_MAX_SPEED = 5
@@ -59,6 +59,9 @@ RACER_DECCELERATION = 0.08
 
 global RACER_RERAIL_FRAMES
 RACER_RERAIL_FRAMES = 20
+
+global FRAMERATE
+FRAMERATE = util.framerate()
 
 
 def get_fave_heart():
@@ -196,7 +199,7 @@ def update_racer_pos(racer, points):
     if racer["on"]:
         t = racer["t"]
         racer["x"], racer["y"] = interpolate_seg(racer["seg"], racer["t"], points)
-    else: # derail
+    else: # is derailed
         racer["x"] += racer["v"] * math.sin(racer["r"])
         racer["y"] -= racer["v"] * math.cos(racer["r"])
 
@@ -318,7 +321,6 @@ def prev_idx(i, points, n=1):
 
 def draw_trak_ui(name, num, fave, view_only=False):
     global FONT_W, FONT_H
-    util.set_font(FONT_W, FONT_H)
     disp.drawText(
         name,
         0, SCREEN_H - FONT_H,
@@ -732,7 +734,7 @@ def trak_select(selection = 0, use_faves=False, multilink=False):
     global FONT_WIDTH, FONT_HEIGHT
     seed = save.load_seed()
     
-    util.set_font(5, 7)
+    util.set_font(FONT_W, FONT_H)
     camera = get_camera()
     if use_faves:
         # copy of faves
@@ -808,13 +810,11 @@ def player_input(racer, points):
             accelerate(racer)
         else:
             deccelerate(racer)
-    
+    """
     if thumbyButton.buttonU.justPressed():
         derail(racer)
     if thumbyButton.buttonD.justPressed():
         rerail(racer, points)
-    
-    """
     if thumbyButton.buttonL.justPressed():
         RACER_MAX_FORCE -= 0.02
     if thumbyButton.buttonR.justPressed():
@@ -827,8 +827,8 @@ def update_racer(racer, points, use_v=True, check_derail=False):
     if use_v and racer["on"]:
         update_racer_seg_t(racer, points)
     update_racer_pos(racer, points)
+    
     update_racer_rot(racer, points)
-
     if check_derail:
         update_racer_derail(racer, points)
 
@@ -863,6 +863,7 @@ def update_race(camera, trak, race_timer, player, opponent=None, multilink=False
 
     update_racer(player, points, check_derail=True)
     update_camera(camera, player, points)
+
     if multilink and opponent:
         received = update_multi(player, opponent)
         # if we've received data, no need to update seg/t from v
@@ -870,6 +871,7 @@ def update_race(camera, trak, race_timer, player, opponent=None, multilink=False
         update_racer(opponent, points, use_v = not received)
     elif opponent: # cpu
         update_racer(opponent, points)
+
     timer.update_timer(race_timer)
 
 
@@ -907,13 +909,12 @@ def draw_text(msg, x, y):
 
 def draw_hud(player, race_timer):
     global RACER_MAX_FORCE
-    util.set_font(MINI_FONT_W, MINI_FONT_H)
     # draw speed
     mph = int(player["v"]/RACER_MAX_SPEED * RACER_MAX_MPH)
     #disp.drawText(f"{player["rv"]}", 0, MINI_FONT_H+1, 1)
     #draw_text(f"{RACER_MAX_FORCE:.2f}", 0, 5*(MINI_FONT_H+1))
     draw_loading_bar_v(
-        player["v"]/RACER_MAX_SPEED,
+        player["dmg"]/RACER_MAX_DMG,
         SCREEN_W-LOADING_BAR_SIZE, SCREEN_H-LOADING_BAR_LENGTH,
         LOADING_BAR_LENGTH
     )
@@ -923,7 +924,7 @@ def draw_hud(player, race_timer):
         LOADING_BAR_LENGTH - 2
     )
     draw_loading_bar_v(
-        player["dmg"]/RACER_MAX_DMG,
+        player["v"]/RACER_MAX_SPEED,
         SCREEN_W-LOADING_BAR_SIZE*3, SCREEN_H-LOADING_BAR_LENGTH + 4,
         LOADING_BAR_LENGTH - 4
     )
@@ -934,10 +935,10 @@ def draw_hud(player, race_timer):
     )
     t = f"{race_timer["time"]:.1f}"
     draw_text(t, SCREEN_W-len(t)*(MINI_FONT_W+1), 0)
-    draw_framerate()
 
 
 def draw_debug(camera, trak, player):
+    global FRAMERATE
     points = trak["trak"]
     px, py = view_transform(camera, player["x"], player["y"])
     i0 = player["seg"] * 2
@@ -949,6 +950,8 @@ def draw_debug(camera, trak, player):
     nx = int(nx * (player["rv"]/RACER_MAX_FORCE) * 20)
     ny = int(ny * (player["rv"]/RACER_MAX_FORCE) * 20)
     disp.drawLine(px, py, px+nx, py+ny, 1)
+    fps = next(FRAMERATE)
+    draw_text(str(fps), 0, 0)
 
 
 def draw_race(camera, trak, race_timer, blocker, player, opponent=None):
@@ -960,6 +963,7 @@ def draw_race(camera, trak, race_timer, blocker, player, opponent=None):
         segment = get_camera_segment(player, trak["trak"]),
         segment_range = RACE_SEGMENT_RANGE
     )
+
     if opponent:
         draw_racer(camera, opponent, blocker)
     if util.DEBUG_MODE:
@@ -972,6 +976,7 @@ def draw_race(camera, trak, race_timer, blocker, player, opponent=None):
 def race(trak, multilink = False):
     # 40fps is a medium between speedy 60 and slow 30
     disp.setFPS(40)
+    util.set_font(MINI_FONT_W, MINI_FONT_H)
     racer_sprite = sprite.Sprite(
         7, 7,
         # BITMAP: width: 56, height: 7

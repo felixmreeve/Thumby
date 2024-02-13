@@ -32,7 +32,7 @@ DEBUG_MODE = True
 # ***************************************
 # extra debug flags
 global DEBUG_ON_DEVICE, DEBUG_FIXED_SEED
-DEBUG_ON_DEVICE = False
+DEBUG_ON_DEVICE = True
 DEBUG_FIXED_SEED = False
 if not EMULATOR:
     DEBUG_MODE = DEBUG_ON_DEVICE
@@ -66,3 +66,4 @@ def framerate():
 
 def new_seed():
     return time.ticks_cpu()
+
