@@ -292,6 +292,10 @@ def get_racer_force(racer):
     return abs(racer["rv"] * racer["v"]) ** RACER_FORCE_POWER * racer["v"]/RACER_MAX_SPEED
 
 
+def get_racer_lap(racer, points):
+    return (racer["seg"]*2) // len(points) + 1
+
+
 def get_rot_frame(angle):
     return int(angle / (2*math.pi)*8 + 0.5) % 8
 
@@ -942,7 +946,7 @@ def draw_start_hud(race_timer):
     msg = "READY?"
     time = -int(race_timer["time"])
     if time > 0:
-        draw_text(msg, (SCREEN_W - len(msg) * (FONT_W + 1)) // 2, 1)
+        draw_text(msg, (SCREEN_W - len(msg) * (FONT_W + 1)) // 2, 1, False)
         msg = str(time)
     else:
         msg = "GO!"
@@ -953,7 +957,7 @@ def draw_start_hud(race_timer):
     )
 
 
-def draw_hud(player, race_timer):
+def draw_hud(player, lap, race_timer):
     global RACER_MAX_FORCE
     mph = int(player["v"] / RACER_MAX_SPEED * RACER_MAX_MPH)
     draw_loading_bar_v(
@@ -987,6 +991,11 @@ def draw_hud(player, race_timer):
         SCREEN_W//4 - (len(t) * (MINI_FONT_W + 1))//2,
         #SCREEN_W - len(t) * (MINI_FONT_W + 1),
         0
+    )
+    draw_mini_text(
+        f"lap{lap}",
+        0,
+        SCREEN_H - MINI_FONT_H
     )
 
 
@@ -1023,7 +1032,8 @@ def draw_race(camera, trak, race_timer, blocker, player, opponent=None):
         draw_debug(camera, trak, player)
     draw_racer(camera, player, blocker)
     if race_timer["time"] >= 0:
-        draw_hud(player, race_timer)
+        lap = get_racer_lap(player, trak["trak"])
+        draw_hud(player, lap, race_timer)
     else:
         draw_start_hud(race_timer)
     disp.update()
