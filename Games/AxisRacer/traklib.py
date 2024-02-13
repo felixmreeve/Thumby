@@ -56,7 +56,7 @@ RACER_MAX_DMG = 6
 
 global RACER_ACCELERATION, RACER_DECCELERATION
 RACER_ACCELERATION = 0.05
-RACER_DECCELERATION = 0.08
+RACER_DECCELERATION = 0.1
 
 global RACER_RERAIL_FRAMES
 RACER_RERAIL_FRAMES = 40
@@ -915,13 +915,27 @@ def draw_loading_bar_h(value, x, y, w):
     )
 
 
-def draw_mini_text(msg, x, y):
-    disp.drawFilledRectangle(x, y, (MINI_FONT_W+1)*len(msg), MINI_FONT_H+1, 0)
+def _draw_text(msg, x, y, f_w, f_h, border=True):
+    w = (f_w + 1) * len(msg)
+    h = f_h + 1
+    if border:
+        w += 2
+        h += 2
+    disp.drawFilledRectangle(x-1, y-1, w, h, 0)
+    if border:
+        disp.drawLine(  x-1,   y-2, x+w-3,   y-2, 1)
+        disp.drawLine(  x-2,   y-1,   x-2, y+h-3, 1)
+        disp.drawLine(  x-1, y+h-2, x+w-3, y+h-2, 1)
+        disp.drawLine(x+w-2,   y-1, x+w-2, y+h-3, 1)
     disp.drawText(msg, x, y, 1)
 
-def draw_text(msg, x, y):
-    disp.drawFilledRectangle(x, y, (FONT_W+1)*len(msg), FONT_H+1, 0)
-    disp.drawText(msg, x, y, 1)
+
+def draw_mini_text(msg, x, y, border=True):
+    _draw_text(msg, x, y, MINI_FONT_W, MINI_FONT_H, border)
+
+
+def draw_text(msg, x, y, border=True):
+    _draw_text(msg, x, y, FONT_W, FONT_H, border)
 
 
 def draw_start_hud(race_timer):
@@ -970,7 +984,7 @@ def draw_hud(player, race_timer):
     t = f"{race_timer["time"]:.1f}"
     draw_mini_text(
         t,
-        (SCREEN_W - len(t) * (MINI_FONT_W + 1)) // 2,
+        SCREEN_W//4 - (len(t) * (MINI_FONT_W + 1))//2,
         #SCREEN_W - len(t) * (MINI_FONT_W + 1),
         0
     )
@@ -986,12 +1000,11 @@ def draw_debug(camera, trak, player):
     x1, y1 = points[i1], points[i1+1]
     nx, ny = get_normal_in(x0, y0, x1, y1)
     # end point is based on player force
-    nx = int(nx * (player["rv"]/0.5) * 30)
-    ny = int(ny * (player["rv"]/0.5) * 30)
+    nx = int(nx * (player["rv"] / 0.5) * 30)
+    ny = int(ny * (player["rv"] / 0.5) * 30)
     disp.drawLine(px, py, px+nx, py+ny, 1)
     fps = next(FRAMERATE)
-    draw_text(str(fps), 0, 0)
-    draw_text(str(player["seg"]), 0, SCREEN_H - MINI_FONT_H)
+    draw_mini_text(str(fps), 0, 0)
 
 
 def draw_race(camera, trak, race_timer, blocker, player, opponent=None):

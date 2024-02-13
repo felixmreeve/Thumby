@@ -28,14 +28,14 @@ else:
 
 # ********** master debug flag **********
 global DEBUG_MODE
-DEBUG_MODE = True
+DEBUG_MODE = False
 # ***************************************
 # extra debug flags
 global DEBUG_ON_DEVICE, DEBUG_FIXED_SEED
 DEBUG_ON_DEVICE = True
 DEBUG_FIXED_SEED = False
 if not EMULATOR:
-    DEBUG_MODE = DEBUG_ON_DEVICE
+    DEBUG_MODE = DEBUG_MODE and DEBUG_ON_DEVICE
 
 
 def set_font(w, h):
