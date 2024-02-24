@@ -7,7 +7,6 @@ GAME_NAME = "AxisRacer"
 import math
 import sys
 
-import thumby
 import thumbyButton as butt
 from thumbyGraphics import display as disp
 import thumbyHardware as hard
@@ -25,9 +24,6 @@ import multi
 global FONT_W, FONT_H
 FONT_W = const(5)
 FONT_H = const(7)
-global MINI_FONT_W, MINI_FONT_H
-MINI_FONT_W = const(3)
-MINI_FONT_H = const(5)
 global BIG_FONT_W, BIG_FONT_H
 BIG_FONT_W = const(8)
 BIG_FONT_H = const(8)
@@ -36,10 +32,6 @@ global SCREEN_W, SCREEN_H
 SCREEN_W = const(72)
 SCREEN_H = const(40)
 
-global TRAK_PREVIEW_W, TRAK_PREVIEW_H
-TRAK_PREVIEW_W = const(SCREEN_W - (FONT_W+1)*2)
-TRAK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
-
 global EMULATOR
 try:
     import emulator
@@ -47,7 +39,6 @@ except ImportError:
     EMULATOR = False
 else:
     EMULATOR = True
-
 
 def menu(*choices, selection=0, title=""):
     disp.setFPS(30)
@@ -301,8 +292,9 @@ def main_menu():
             "hot seat",
             "time trial",
             "tournament",
-            "achievements",
+            "get trak",
             "share times",
+            "achievements",
             "demo mode",
             "reroll traks",
             selection = choice,
@@ -320,13 +312,15 @@ def main_menu():
             time_trial()
         elif choice == 4: # tournament
             tournament()
-        elif choice == 5: # achievements
-            achievements()
+        elif choice == 5: # get trak
+            get_trak()
         elif choice == 6: # share times
             share_times()
-        elif choice == 7: # demo mode
+        elif choice == 7: # achievements
+            achievements()
+        elif choice == 8: # demo mode
             demo_mode()
-        elif choice == 8: # reroll traks
+        elif choice == 9: # reroll traks
             reroll_traks()
             choice = 0 # reset choice to 1 player so they can see new traks
 

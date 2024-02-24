@@ -46,6 +46,8 @@ TRAK_PREVIEW_H = const(SCREEN_H - (FONT_H+1))
 global RACE_SEGMENT_RANGE
 # there and back again
 RACE_SEGMENT_RANGE = (max(SCREEN_W, SCREEN_H) // TRAK_SEGMENT_LENGTH) # + 1
+global RACE_LAPS
+RACE_LAPS = 3
 
 global RACER_MAX_SPEED, RACER_MAX_MPH, RACER_MAX_FORCE, RACER_MAX_DMG, RACER_FORCE_POWER
 RACER_MAX_SPEED = 5
@@ -168,6 +170,8 @@ def get_racer(sprite, points):
         "x": 0, # x pos
         "y": 0, # y pos
         "on": True, # on=ontrak / off=derailed
+        "fin": False, # finished the race
+        "pos": 1, # position
         "spr": sprite, # sprite obj
     }
     update_racer_rot(racer, points)
@@ -534,9 +538,6 @@ def get_bounding_box(point_list):
     w = max_x - min_x
     h = max_y - min_y
 
-    x_coords = sorted(point_list[::2])
-    y_coords = sorted(point_list[1::2])
-
     return min_x, min_y, w, h
 
 
@@ -834,7 +835,7 @@ def player_input(racer, points):
     return quit
 
 
-def update_racer(racer, points, use_v=True, check_derail=False):
+def update_racer(racer, points, race_timer, use_v=True, check_derail=False):
     if use_v and racer["on"]:
         update_racer_seg_t(racer, points)
     update_racer_pos(racer, points)
@@ -842,6 +843,9 @@ def update_racer(racer, points, use_v=True, check_derail=False):
     update_racer_rot(racer, points)
     if check_derail:
         update_racer_derail(racer, points)
+    if not racer["fin"] and get_racer_lap(racer, points) > RACE_LAPS:
+        racer["fin"] = race_timer["time"]
+        util.set_font(FONT_W, FONT_H)
 
 
 def get_camera_segment(racer, points):
@@ -867,23 +871,32 @@ def update_multi(player, opponent):
     return received
 
 
+def update_positions(*racers):
+    for i, racer in enumerate(sorted(racers,
+                                     key = lambda x: (x["seg"], x["t"]),
+                                     reverse = True
+        )):
+        racer["pos"] = i+1
+
+
 def update_race(camera, trak, race_timer, player, opponent=None, multilink=False):
     quit = False
     points = trak["trak"]
     # process input
     if race_timer["time"] >= 0:
         quit = player_input(player, points)
-    update_racer(player, points, check_derail=True)
+    update_racer(player, points, race_timer, check_derail=True)
     update_camera(camera, player, points)
 
     if multilink and opponent:
         received = update_multi(player, opponent)
         # if we've received data, no need to update seg/t from v
         # but if we didn't receieve any data, use v to estimate next seg/t
-        update_racer(opponent, points, use_v = not received)
+        update_racer(opponent, points, race_timer, use_v = not received)
     elif opponent: # cpu
-        update_racer(opponent, points)
-
+        update_racer(opponent, points, race_timer)
+    if opponent:
+        update_positions(player, opponent)
     timer.update_timer(race_timer)
     # hud font changes after race start
     if not race_timer["go"] and race_timer["time"] >= 0:
@@ -959,44 +972,72 @@ def draw_start_hud(race_timer):
 
 def draw_hud(player, lap, race_timer):
     global RACER_MAX_FORCE
-    mph = int(player["v"] / RACER_MAX_SPEED * RACER_MAX_MPH)
-    draw_loading_bar_v(
-        player["dmg"] / RACER_MAX_DMG,
-        SCREEN_W - LOADING_BAR_SIZE,
-        SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1,
-        LOADING_BAR_LENGTH
-    )
-    draw_loading_bar_v(
-        get_racer_force(player) / RACER_MAX_FORCE,
-        SCREEN_W - LOADING_BAR_SIZE * 2,
-        SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1 + 2,
-        LOADING_BAR_LENGTH - 2
-    )
-    draw_loading_bar_v(
-        player["v"] / RACER_MAX_SPEED,
-        SCREEN_W - LOADING_BAR_SIZE * 3,
-        SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1 + 4,
-        LOADING_BAR_LENGTH - 4
-    )
-    mph = f"{mph:>3}mph"
-    draw_mini_text(
-        mph,
-        #(SCREEN_W - len(mph) * (MINI_FONT_W+1))//2,
-        SCREEN_W - (MINI_FONT_W + 1) * 6, # - LOADING_BAR_SIZE * 3,
-        SCREEN_H - MINI_FONT_H
-    )
-    t = f"{race_timer["time"]:.1f}"
-    draw_mini_text(
-        t,
-        SCREEN_W//4 - (len(t) * (MINI_FONT_W + 1))//2,
-        #SCREEN_W - len(t) * (MINI_FONT_W + 1),
-        0
-    )
-    draw_mini_text(
-        f"lap{lap}",
-        0,
-        SCREEN_H - MINI_FONT_H
-    )
+    if player["fin"]:
+        msg = "WIN!"
+        draw_text(
+            msg,
+            (SCREEN_W - len(msg) * (FONT_W + 1)) // 2,
+            (SCREEN_H - (FONT_H + 1)) // 2
+        )
+        fin_time = f"{player["fin"]:.3f}"
+        draw_text(
+            fin_time,
+            (SCREEN_W - len(fin_time) * (FONT_W+1))//2,
+            SCREEN_H - FONT_H - 1
+        )
+    else:
+        mph = int(player["v"] / RACER_MAX_SPEED * RACER_MAX_MPH)
+        draw_loading_bar_v(
+            player["dmg"] / RACER_MAX_DMG,
+            SCREEN_W - LOADING_BAR_SIZE,
+            SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1,
+            LOADING_BAR_LENGTH
+        )
+        draw_loading_bar_v(
+            get_racer_force(player) / RACER_MAX_FORCE,
+            SCREEN_W - LOADING_BAR_SIZE * 2,
+            SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1 + 2,
+            LOADING_BAR_LENGTH - 2
+        )
+        draw_loading_bar_v(
+            player["v"] / RACER_MAX_SPEED,
+            SCREEN_W - LOADING_BAR_SIZE * 3,
+            SCREEN_H - LOADING_BAR_LENGTH - MINI_FONT_H - 1 + 4,
+            LOADING_BAR_LENGTH - 4
+        )
+        mph = f"{mph:>3}mph"
+        draw_mini_text(
+            mph,
+            #(SCREEN_W - len(mph) * (MINI_FONT_W+1))//2,
+            SCREEN_W - (MINI_FONT_W + 1) * 6, # - LOADING_BAR_SIZE * 3,
+            SCREEN_H - MINI_FONT_H
+        )
+        t = f"{race_timer["time"]:.1f}"
+        draw_mini_text(
+            t,
+            SCREEN_W//4 - (len(t) * (MINI_FONT_W + 1))//2,
+            #SCREEN_W - len(t) * (MINI_FONT_W + 1),
+            0
+        )
+        draw_mini_text(
+            f"lap{lap}/{RACE_LAPS}",
+            0,
+            SCREEN_H - MINI_FONT_H
+        )
+        pos = player["pos"]
+        if pos == 1:
+            pos = "1st"
+        elif pos == 2:
+            pos = "2nd"
+        elif pos == 3:
+            pos = "3rd"
+        else:
+            pos = f"{pos}th"
+        draw_mini_text(
+            pos,
+            SCREEN_W-(MINI_FONT_W+1)*len(pos),
+            0,
+        )
 
 
 def draw_debug(camera, trak, player):
@@ -1017,7 +1058,7 @@ def draw_debug(camera, trak, player):
 
 
 def draw_race(camera, trak, race_timer, blocker, player, opponent=None):
-    global RACE_SEGMENT_RANGE
+    global RACE_SEGMENT_RANG, RACE_LAPS
     disp.fill(0)
     draw_trak(
         camera,
